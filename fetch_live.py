@@ -70,39 +70,47 @@ RSS_FEEDS = [
 ]
 
 
-def fetch_binance_24h():
-    """Datos 24h de Binance para todos los pares."""
+def fetch_bybit_24h():
+    """Datos 24h de Bybit para todos los pares."""
     out = {}
     try:
-        r = requests.get("https://api.binance.com/api/v3/ticker/24hr", timeout=15)
+        r = requests.get("https://api.bybit.com/v5/market/tickers?category=spot", timeout=15)
         r.raise_for_status()
-        all_data = {item["symbol"]: item for item in r.json()}
+        items = r.json().get("result", {}).get("list", [])
+        all_data = {item["symbol"]: item for item in items}
         for pair in CRYPTO_PAIRS:
             if pair in all_data:
                 d = all_data[pair]
+                price = float(d["lastPrice"])
+                prev = float(d["prevPrice24h"]) if d.get("prevPrice24h") else 0
+                change = price - prev
+                change_pct = (change / prev * 100) if prev != 0 else 0
                 out[pair] = {
-                    "price":     float(d["lastPrice"]),
-                    "change":    float(d["priceChange"]),
-                    "change_pct": float(d["priceChangePercent"]),
-                    "high":      float(d["highPrice"]),
-                    "low":       float(d["lowPrice"]),
-                    "volume":    float(d["volume"]),
-                    "quote_vol": float(d["quoteVolume"]),
+                    "price":     price,
+                    "change":    change,
+                    "change_pct": change_pct,
+                    "high":      float(d["highPrice24h"]),
+                    "low":       float(d["lowPrice24h"]),
+                    "volume":    float(d["volume24h"]),
+                    "quote_vol": float(d["turnover24h"]),
                 }
     except Exception as e:
-        print(f"Error Binance 24h. {e}")
+        print(f"Error Bybit 24h. {e}")
     return out
 
 
 def fetch_btc_klines(interval="1h", limit=200):
-    """Velas de BTC para grafico. limit max 1000."""
+    """Velas de BTC via Bybit. limit max 1000."""
+    interval_map = {"1h": "60", "5m": "5"}
+    bybit_interval = interval_map.get(interval, "60")
     try:
-        url = "https://api.binance.com/api/v3/klines"
-        params = {"symbol": "BTCUSDT", "interval": interval, "limit": limit}
+        url = "https://api.bybit.com/v5/market/kline"
+        params = {"category": "spot", "symbol": "BTCUSDT", "interval": bybit_interval, "limit": limit}
         r = requests.get(url, params=params, timeout=15)
         r.raise_for_status()
+        raw = r.json().get("result", {}).get("list", [])
         out = []
-        for k in r.json():
+        for k in raw:
             out.append({
                 "time":   int(k[0]) // 1000,
                 "open":   float(k[1]),
@@ -111,6 +119,7 @@ def fetch_btc_klines(interval="1h", limit=200):
                 "close":  float(k[4]),
                 "volume": float(k[5]),
             })
+        out.sort(key=lambda x: x["time"])
         return out
     except Exception as e:
         print(f"Error klines BTC. {e}")
@@ -261,8 +270,8 @@ def main():
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
-    print("Binance 24h...")
-    out["crypto"] = fetch_binance_24h()
+    print("Bybit 24h...")
+    out["crypto"] = fetch_bybit_24h()
     print(f"  {len(out['crypto'])} pares")
 
     print("BTC klines 1h...")
