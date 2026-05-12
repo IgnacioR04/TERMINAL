@@ -2,14 +2,14 @@ name: Live data
 
 on:
   schedule:
-    - cron: "*/2 * * * *"   # cada 2 min (cambia segun tu plan de GH Actions)
+    - cron: "*/2 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: live-data
+  group: data-push
   cancel-in-progress: true
 
 jobs:
@@ -18,26 +18,23 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
-
-      - name: Install deps
-        run: pip install -r requirements.txt
-
-      - name: Fetch live data
-        run: python fetch_live.py
-
+      - run: pip install -r requirements.txt
+      - run: python fetch_live.py
       - name: Fetch TFG signals
         run: python tfg_signals.py
-        continue-on-error: true   # si fallan los modelos, no rompe el job
-
-      - name: Commit data
+        continue-on-error: true
+      - name: Commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/live_data.json data/tfg_signals.json
           git diff --staged --quiet || git commit -m "live data $(date -u +%Y-%m-%dT%H:%M)"
-          git push
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push && break
+            echo "Push intento $i fallido. Reintento."
+            sleep 5
+          done
