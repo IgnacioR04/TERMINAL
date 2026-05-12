@@ -6,7 +6,7 @@
 <title>TFG Terminal · BTC/USDT Trading System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
 :root {
@@ -37,14 +37,14 @@
 * { margin:0; padding:0; box-sizing:border-box; }
 html, body { height:100%; }
 body {
-  font-family: 'Geist', sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg-0);
   color: var(--txt-0);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
-.mono { font-family: 'Geist Mono', monospace; font-variant-numeric: tabular-nums; }
+.mono { font-family: 'DM Mono', monospace; font-variant-numeric: tabular-nums; }
 .serif { font-family: 'Fraunces', serif; font-style: italic; }
 
 /* ── Layout ── */
@@ -155,7 +155,7 @@ body {
 }
 .topbar-right { display: flex; align-items: center; gap: 18px; }
 .time-display {
-  font-family: 'Geist Mono', monospace;
+  font-family: 'DM Mono', monospace;
   font-size: 12px;
   color: var(--txt-1);
 }
@@ -209,8 +209,8 @@ body {
 }
 .quote-card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .quote-name { font-size: 13px; color: var(--txt-1); margin-bottom: 6px; font-weight: 500; }
-.quote-price { font-family: 'Geist Mono', monospace; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
-.quote-change { font-family: 'Geist Mono', monospace; font-size: 12px; margin-top: 4px; }
+.quote-price { font-family: 'DM Mono', monospace; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.quote-change { font-family: 'DM Mono', monospace; font-size: 12px; margin-top: 4px; }
 .quote-meta { font-size: 11px; color: var(--txt-2); margin-top: 8px; }
 .up { color: var(--accent); }
 .down { color: var(--red); }
@@ -248,17 +248,17 @@ body {
   font-weight: 500;
 }
 .hero-price {
-  font-family: 'Geist Mono', monospace;
+  font-family: 'DM Mono', monospace;
   font-size: 58px;
   font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1;
 }
-.hero-change { font-family: 'Geist Mono', monospace; font-size: 16px; margin-top: 12px; }
+.hero-change { font-family: 'DM Mono', monospace; font-size: 16px; margin-top: 12px; }
 .hero-stats { display: flex; gap: 32px; margin-top: 22px; }
 .hero-stat { }
 .hero-stat-label { font-size: 11px; color: var(--txt-2); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px; }
-.hero-stat-val { font-family: 'Geist Mono', monospace; font-size: 15px; }
+.hero-stat-val { font-family: 'DM Mono', monospace; font-size: 15px; }
 
 /* ── Chart container ── */
 .chart-box {
@@ -413,7 +413,7 @@ body {
   font-weight: 600;
 }
 .pred-prob {
-  font-family: 'Geist Mono', monospace;
+  font-family: 'DM Mono', monospace;
   font-size: 24px;
   font-weight: 600;
   margin: 6px 0 2px;
@@ -442,7 +442,7 @@ body {
   padding: 12px;
   border-bottom: 1px solid var(--line);
   font-size: 13px;
-  font-family: 'Geist Mono', monospace;
+  font-family: 'DM Mono', monospace;
 }
 .signals-table tr.active-row td { background: var(--accent-glow); }
 .pass-yes { color: var(--accent); }
@@ -460,14 +460,14 @@ body {
   border-radius: var(--radius-s);
   font-size: 12px;
 }
-.cal-time { font-family: 'Geist Mono', monospace; color: var(--txt-1); }
-.cal-country { font-family: 'Geist Mono', monospace; color: var(--txt-2); font-size: 11px; }
+.cal-time { font-family: 'DM Mono', monospace; color: var(--txt-1); }
+.cal-country { font-family: 'DM Mono', monospace; color: var(--txt-2); font-size: 11px; }
 .cal-event { color: var(--txt-0); }
 .cal-impact { font-size: 10px; padding: 2px 6px; border-radius: 3px; text-align: center; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
 .cal-impact.high { background: var(--red-dim); color: var(--red); }
 .cal-impact.medium { background: var(--amber-dim); color: var(--amber); }
 .cal-impact.low { background: var(--bg-3); color: var(--txt-2); }
-.cal-value { font-family: 'Geist Mono', monospace; font-size: 11px; color: var(--txt-1); }
+.cal-value { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--txt-1); }
 
 /* ── Stocks ── */
 .stocks-controls {
@@ -480,7 +480,7 @@ body {
   padding: 10px 14px;
   border-radius: var(--radius-s);
   font-size: 13px;
-  font-family: 'Geist', sans-serif;
+  font-family: 'DM Sans', sans-serif;
   flex: 1;
   max-width: 320px;
 }
@@ -526,9 +526,9 @@ body {
   font-size: 13px;
 }
 .stocks-table tr:hover td { background: var(--bg-2); cursor: pointer; }
-.stocks-table .ticker { font-family: 'Geist Mono', monospace; font-weight: 600; }
+.stocks-table .ticker { font-family: 'DM Mono', monospace; font-weight: 600; }
 .stocks-table .name { color: var(--txt-1); }
-.stocks-table .num { font-family: 'Geist Mono', monospace; text-align: right; }
+.stocks-table .num { font-family: 'DM Mono', monospace; text-align: right; }
 
 /* ── Stock detail modal ── */
 .modal-overlay {
@@ -698,9 +698,15 @@ body {
       </div>
 
       <div class="chart-box">
-        <div class="chart-tabs">
-          <button class="chart-tab active" data-interval="1h">1H</button>
-          <button class="chart-tab" data-interval="5m">5M</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="chart-tabs">
+            <button class="chart-tab active" data-interval="1h">1H</button>
+            <button class="chart-tab" data-interval="5m">5M</button>
+          </div>
+          <div style="display:flex;gap:16px;font-size:11px;color:var(--txt-2)">
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(77,139,255,0.3);margin-right:4px;vertical-align:middle"></span>Low vol</span>
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(255,92,92,0.3);margin-right:4px;vertical-align:middle"></span>High vol</span>
+          </div>
         </div>
         <div id="main-chart"></div>
       </div>
@@ -712,14 +718,16 @@ body {
         </div>
         <div>
           <div class="card-title">Sentiment</div>
-          <div class="card fg-gauge">
-            <div class="fg-label" id="fg-label">—</div>
-            <div class="fg-value" id="fg-value">—</div>
-            <div class="fg-bar">
-              <div class="fg-bar-fill"></div>
-              <div class="fg-pointer" id="fg-pointer" style="left:50%"></div>
+          <div class="card" style="text-align:center;padding:28px 20px">
+            <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.16em;font-weight:600;margin-bottom:6px" id="fg-label">—</div>
+            <div style="font-family:'DM Mono',monospace;font-size:64px;font-weight:700;letter-spacing:-0.04em;line-height:1" id="fg-value">—</div>
+            <div style="position:relative;height:10px;background:linear-gradient(90deg,#ff5c5c 0%,#f9b023 35%,#f9b023 50%,#00d09c 100%);border-radius:5px;margin:20px 0 8px;overflow:visible">
+              <div id="fg-pointer" style="position:absolute;top:-5px;width:20px;height:20px;background:var(--txt-0);border:3px solid var(--bg-1);border-radius:50%;transform:translateX(-50%);left:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:left 0.5s ease"></div>
             </div>
-            <div style="font-size:11px;color:var(--txt-2);margin-top:6px">Fear & Greed (cripto)</div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--txt-2);margin-top:4px">
+              <span>Extreme Fear</span><span>Neutral</span><span>Extreme Greed</span>
+            </div>
+            <div style="font-size:11px;color:var(--txt-2);margin-top:12px">Fear & Greed Index (cripto)</div>
           </div>
         </div>
       </div>
@@ -806,6 +814,7 @@ const STATE = {
   tfg: null,
   chart: null,
   series: null,
+  regimeSeries: null,
   chartInterval: "1h",
 };
 
@@ -1075,6 +1084,7 @@ function renderMainChart(d) {
       rightPriceScale: { borderColor: "#262a32" },
       crosshair: { mode: 0 },
       height: 380,
+      width: container.clientWidth,
     });
     STATE.series = STATE.chart.addCandlestickSeries({
       upColor: "#00d09c", downColor: "#ff5c5c",
@@ -1090,6 +1100,37 @@ function renderMainChart(d) {
     STATE.series.setData(klines.map(k => ({
       time: k.time, open: k.open, high: k.high, low: k.low, close: k.close,
     })));
+  }
+
+  // Overlay de regimen HMM si hay datos TFG y estamos en 1h
+  if (STATE.chartInterval === "1h" && STATE.tfg && STATE.tfg.status === "ok" && STATE.tfg.history) {
+    if (!STATE.regimeSeries) {
+      STATE.regimeSeries = STATE.chart.addHistogramSeries({
+        priceScaleId: 'regime',
+        color: '#00d09c',
+        priceFormat: { type: 'volume' },
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+      STATE.chart.priceScale('regime').applyOptions({
+        scaleMargins: { top: 0, bottom: 0 },
+        visible: false,
+      });
+    }
+    const hist = STATE.tfg.history;
+    if (hist.time && hist.hmm_p_highvol) {
+      const regimeData = hist.time.map((t, i) => {
+        const ts = Math.floor(new Date(t).getTime() / 1000);
+        const pHigh = hist.hmm_p_highvol[i] || 0;
+        const isHigh = pHigh > 0.5;
+        return {
+          time: ts,
+          value: 1,
+          color: isHigh ? 'rgba(255,92,92,0.08)' : 'rgba(77,139,255,0.08)',
+        };
+      });
+      STATE.regimeSeries.setData(regimeData);
+    }
   }
 }
 
@@ -1254,7 +1295,7 @@ function renderTFG() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
           <div>
             <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Cierre</div>
-            <div style="font-family:'Geist Mono',monospace;font-size:22px;margin-top:4px">$${fmt.price(d.current_candle.close)}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:22px;margin-top:4px">$${fmt.price(d.current_candle.close)}</div>
           </div>
           <div>
             <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Timestamp</div>
@@ -1331,7 +1372,7 @@ function openAssetModal(category, code, displayName) {
   function kvB(label, value) {
     return `<div style="background:var(--bg-2);border:1px solid var(--line);padding:14px;border-radius:6px">
       <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">${label}</div>
-      <div style="font-family:'Geist Mono',monospace;font-size:16px;margin-top:6px">${value}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:16px;margin-top:6px">${value}</div>
     </div>`;
   }
 
@@ -1341,7 +1382,7 @@ function openAssetModal(category, code, displayName) {
       <span style="background:var(--bg-3);padding:4px 10px;border-radius:4px;font-size:11px">${code}</span>
     </div>
     <div style="display:flex;align-items:baseline;gap:14px;margin:18px 0">
-      <div style="font-family:'Geist Mono',monospace;font-size:42px;font-weight:600">${fmt.price(lastClose)}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:42px;font-weight:600">${fmt.price(lastClose)}</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">
       ${kvB("ATH", fmt.price(allTimeHigh))}
