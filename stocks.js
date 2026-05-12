@@ -145,7 +145,7 @@ window.StocksTab = (function () {
       <div style="color:var(--txt-1);font-size:15px;margin-bottom:8px">${escapeHtml(d.long_name || d.name)}</div>
 
       <div style="display:flex;align-items:baseline;gap:14px;margin:18px 0">
-        <div style="font-family:'Geist Mono',monospace;font-size:42px;font-weight:600">${fmtMoney(d.price)} <span style="color:var(--txt-2);font-size:18px">${d.currency}</span></div>
+        <div style="font-family:'DM Mono',monospace;font-size:42px;font-weight:600">${fmtMoney(d.price)} <span style="color:var(--txt-2);font-size:18px">${d.currency}</span></div>
         <div class="mono ${chgCls}" style="font-size:16px">${fmtPct(d.change_pct)}</div>
       </div>
 
@@ -178,7 +178,7 @@ window.StocksTab = (function () {
           <div class="card-title">Eventos corporativos</div>
           ${d.next_earnings ? `<div style="background:var(--bg-2);border:1px solid var(--line);padding:12px;border-radius:6px;margin-bottom:12px">
             <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Próximos earnings</div>
-            <div style="font-family:'Geist Mono',monospace;font-size:15px;margin-top:4px">${d.next_earnings}</div>
+            <div style="font-family:'DM Mono',monospace;font-size:15px;margin-top:4px">${d.next_earnings}</div>
           </div>` : ""}
           ${divs ? `<div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px">Últimos dividendos</div>
           <table style="width:100%;border-collapse:collapse;font-size:12px">${divs}</table>` : "<div style='color:var(--txt-2);font-size:12px'>Sin dividendos recientes.</div>"}
@@ -212,7 +212,7 @@ window.StocksTab = (function () {
   function kvBlock(label, value) {
     return `<div style="background:var(--bg-2);border:1px solid var(--line);padding:14px;border-radius:6px">
       <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">${label}</div>
-      <div style="font-family:'Geist Mono',monospace;font-size:16px;margin-top:6px">${value}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:16px;margin-top:6px">${value}</div>
     </div>`;
   }
 
