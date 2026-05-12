@@ -122,40 +122,53 @@ def fetch_crypto_24h():
 
 
 def fetch_btc_klines(interval="1h", limit=200):
-    """Velas de BTC via Yahoo Finance (funciona desde GitHub Actions)."""
-    yf_interval = interval
+    """Velas de BTC desde CSV local (1h) o Yahoo Finance (5m)."""
     if interval == "1h":
-        period = "30d"
-    elif interval == "5m":
-        period = "5d"
-    else:
-        period = "7d"
-    try:
-        t = yf.Ticker("BTC-USD")
-        df = t.history(period=period, interval=yf_interval, auto_adjust=False)
-        if df is None or df.empty:
+        csv_path = "data/btc_1h.csv"
+        try:
+            df = pd.read_csv(csv_path)
+            date_col = "datetime_utc" if "datetime_utc" in df.columns else df.columns[0]
+            df["ts"] = pd.to_datetime(df[date_col], utc=True).apply(lambda x: int(x.timestamp()))
+            df = df.tail(limit)
+            out = []
+            for _, row in df.iterrows():
+                out.append({
+                    "time":   int(row["ts"]),
+                    "open":   float(row["open"]),
+                    "high":   float(row["high"]),
+                    "low":    float(row["low"]),
+                    "close":  float(row["close"]),
+                    "volume": float(row["volume"]),
+                })
+            return out
+        except Exception as e:
+            print(f"Error klines BTC CSV. {e}")
             return []
-        df = df.reset_index()
-        date_col = "Datetime" if "Datetime" in df.columns else "Date"
-        out = []
-        for _, row in df.iterrows():
-            d = row[date_col]
-            if hasattr(d, "timestamp"):
-                ts = int(d.timestamp())
-            else:
-                ts = int(pd.Timestamp(d).timestamp())
-            out.append({
-                "time":   ts,
-                "open":   float(row.get("Open", 0)),
-                "high":   float(row.get("High", 0)),
-                "low":    float(row.get("Low", 0)),
-                "close":  float(row.get("Close", 0)),
-                "volume": float(row.get("Volume", 0)),
-            })
-        return out
-    except Exception as e:
-        print(f"Error klines BTC. {e}")
-        return []
+    else:
+        # 5m via Yahoo Finance
+        try:
+            t = yf.Ticker("BTC-USD")
+            df = t.history(period="5d", interval="5m", auto_adjust=False)
+            if df is None or df.empty:
+                return []
+            df = df.reset_index()
+            date_col = "Datetime" if "Datetime" in df.columns else "Date"
+            out = []
+            for _, row in df.iterrows():
+                d = row[date_col]
+                ts = int(d.timestamp()) if hasattr(d, "timestamp") else int(pd.Timestamp(d).timestamp())
+                out.append({
+                    "time":   ts,
+                    "open":   float(row.get("Open", 0)),
+                    "high":   float(row.get("High", 0)),
+                    "low":    float(row.get("Low", 0)),
+                    "close":  float(row.get("Close", 0)),
+                    "volume": float(row.get("Volume", 0)),
+                })
+            return out
+        except Exception as e:
+            print(f"Error klines BTC 5m. {e}")
+            return []
 
 
 def fetch_yf_batch(symbols):
