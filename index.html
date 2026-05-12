@@ -703,6 +703,11 @@ body {
             <button class="chart-tab active" data-interval="1h">1H</button>
             <button class="chart-tab" data-interval="5m">5M</button>
           </div>
+          <div class="chart-tabs" id="period-tabs">
+            <button class="chart-tab" data-period="7">7D</button>
+            <button class="chart-tab" data-period="30">30D</button>
+            <button class="chart-tab active" data-period="0">Todo</button>
+          </div>
           <div style="display:flex;gap:16px;font-size:11px;color:var(--txt-2)">
             <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(77,139,255,0.3);margin-right:4px;vertical-align:middle"></span>Low vol</span>
             <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(255,92,92,0.3);margin-right:4px;vertical-align:middle"></span>High vol</span>
@@ -816,6 +821,7 @@ const STATE = {
   series: null,
   regimeSeries: null,
   chartInterval: "1h",
+  chartPeriod: 0,
 };
 
 // ──────────────────────────────────────────────────────────────────────
@@ -1095,8 +1101,12 @@ function renderMainChart(d) {
       STATE.chart.applyOptions({ width: container.clientWidth });
     });
   }
-  const klines = STATE.chartInterval === "1h" ? d.btc_klines_1h : d.btc_klines_5m;
+  let klines = STATE.chartInterval === "1h" ? d.btc_klines_1h : d.btc_klines_5m;
   if (klines && klines.length) {
+    if (STATE.chartPeriod > 0) {
+      const cutoff = Math.floor(Date.now() / 1000) - STATE.chartPeriod * 86400;
+      klines = klines.filter(k => k.time >= cutoff);
+    }
     STATE.series.setData(klines.map(k => ({
       time: k.time, open: k.open, high: k.high, low: k.low, close: k.close,
     })));
@@ -1134,11 +1144,22 @@ function renderMainChart(d) {
   }
 }
 
-document.querySelectorAll(".chart-tab").forEach(btn => {
+// Interval tabs (1H / 5M)
+document.querySelectorAll(".chart-tab[data-interval]").forEach(btn => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".chart-tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".chart-tab[data-interval]").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     STATE.chartInterval = btn.dataset.interval;
+    if (STATE.live) renderMainChart(STATE.live);
+  });
+});
+
+// Period tabs (7D / 30D / Todo)
+document.querySelectorAll("#period-tabs .chart-tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#period-tabs .chart-tab").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    STATE.chartPeriod = parseInt(btn.dataset.period) || 0;
     if (STATE.live) renderMainChart(STATE.live);
   });
 });
@@ -1221,107 +1242,98 @@ function renderTFG() {
   const sigs = d.signals || [];
   const preds = d.predictions || {};
   const regime = d.regime || {};
+  const regColor = regime.label === 'highvol' ? 'var(--amber)' : 'var(--accent)';
 
+  // Predictions cards
   const predsHtml = ["logloss", "error", "brier", "sharpe"].map(v => {
     const p = preds[v];
     if (!p) return "";
     const dirCls = p.direction === "LONG" ? "long" : "short";
+    const barW = Math.abs(p.prob_cal - 0.5) * 200;
     return `
       <div class="pred-cell">
-        <div class="pred-version">${v}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="pred-version">${v.toUpperCase()}</div>
+          <div class="pred-dir ${dirCls}">${p.direction}</div>
+        </div>
         <div class="pred-prob">${(p.prob_cal * 100).toFixed(1)}%</div>
-        <div class="pred-conf">Conf: ${(p.confidence * 100).toFixed(1)}%</div>
-        <div class="pred-dir ${dirCls}">${p.direction}</div>
+        <div style="height:3px;background:var(--bg-3);border-radius:2px;margin:8px 0">
+          <div style="height:100%;width:${barW}%;background:${p.direction === 'LONG' ? 'var(--accent)' : 'var(--red)'};border-radius:2px"></div>
+        </div>
+        <div style="font-size:11px;color:var(--txt-2)">Confianza ${(p.confidence * 100).toFixed(1)}%</div>
       </div>
     `;
   }).join("");
 
-  const sigRows = sigs.map(s => `
-    <tr class="${s.operates ? "active-row" : ""}">
-      <td>${s.version}</td>
-      <td><span class="pred-dir ${s.side === "LONG" ? "long" : "short"}">${s.side}</span></td>
-      <td>${(s.prob_cal * 100).toFixed(2)}%</td>
-      <td>${(s.confidence * 100).toFixed(2)}%</td>
-      <td>${(s.effective_conf * 100).toFixed(1)}%</td>
-      <td>${s.multiplier.toFixed(2)}x</td>
-      <td>${s.tp_pct !== null ? (s.tp_pct * 100).toFixed(3) + "%" : "—"}</td>
-      <td class="${s.passes_conf ? "pass-yes" : "pass-no"}">${s.passes_conf ? "✓" : "✗"}</td>
-      <td class="${s.passes_dz ? "pass-yes" : "pass-no"}">${s.passes_dz ? "✓" : "✗"}</td>
-      <td>${s.operates ? "<span class='pass-yes'>SÍ</span>" : "no"}</td>
-    </tr>
-  `).join("");
+  // Signals - simplified cards
+  const sigCards = sigs.map(s => {
+    const reason = !s.passes_conf ? `Conf ${(s.confidence*100).toFixed(1)}% < ${(s.effective_conf*100).toFixed(1)}%` :
+                   !s.passes_dz ? `P(deadzone) ${(d.p_deadzone*100).toFixed(1)}% > 50%` : '';
+    return `
+      <div style="background:var(--bg-2);border:1px solid ${s.operates ? 'var(--accent)' : 'var(--line)'};border-radius:8px;padding:16px;display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="mono" style="font-weight:600;font-size:13px">${s.version}</span>
+          <span class="pred-dir ${s.side === 'LONG' ? 'long' : 'short'}">${s.side}</span>
+          <span class="mono" style="font-size:12px;color:var(--txt-1)">${(s.confidence*100).toFixed(1)}%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="mono" style="font-size:12px;color:var(--txt-2)">TP ${s.tp_pct !== null ? (s.tp_pct*100).toFixed(3)+'%' : '—'}</span>
+          <span class="mono" style="font-size:12px;color:var(--txt-2)">${s.multiplier.toFixed(2)}x</span>
+          ${s.operates
+            ? '<span style="background:var(--accent);color:var(--bg-0);padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600">OPERA</span>'
+            : '<span style="color:var(--txt-2);font-size:11px">' + reason + '</span>'}
+        </div>
+      </div>
+    `;
+  }).join("");
 
   root.innerHTML = `
-    <div class="tfg-hero">
-      <div class="signal-row">
-        <div>
-          <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.14em">Predicción próxima vela horaria</div>
-          <div style="font-family:'Fraunces',serif;font-size:34px;font-weight:500;margin-top:6px">
-            BTC/USDT · <span class="mono" style="font-style:italic">${d.target_time.slice(11, 16)} UTC</span>
-          </div>
-          <div style="margin-top:8px;color:var(--txt-1);font-size:13px">
-            Régimen actual: <strong style="color:${regime.label === 'highvol' ? 'var(--amber)' : 'var(--accent)'}">${regime.label}</strong>
-            · P(highvol)=${(regime.p_highvol * 100).toFixed(1)}%
-            · σ̂ GARCH=${(d.garch_vol_t1 * 100).toFixed(3)}%
-            · P(deadzone)=${d.p_deadzone !== null ? (d.p_deadzone * 100).toFixed(1) + "%" : "—"}
-          </div>
-        </div>
-        <div class="signal-status ${active ? 'active' : 'idle'}">
-          ${active ? "● SEÑAL ACTIVA" : "○ SIN SEÑAL"}
+    <div style="display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;margin-bottom:24px">
+      <div>
+        <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:6px">Target</div>
+        <div style="font-size:28px;font-weight:600;letter-spacing:-0.02em">
+          BTC/USDT <span class="mono" style="color:var(--txt-1);font-size:20px">${d.target_time.slice(11, 16)} UTC</span>
         </div>
       </div>
-
-      <div class="tfg-pred-grid">${predsHtml}</div>
+      <div class="signal-status ${active ? 'active' : 'idle'}">
+        ${active ? "OPERA" : "SIN SEÑAL"}
+      </div>
     </div>
 
-    <div class="card" style="margin-top:20px">
-      <div class="card-title">Reglas adaptativas (versión × lado)
-        <span class="tag">conf_boost = +${(d.config.conf_boost * 100).toFixed(0)}%</span>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
+      <div style="background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:14px">
+        <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Régimen</div>
+        <div class="mono" style="font-size:18px;margin-top:6px;color:${regColor}">${regime.label}</div>
       </div>
-      <table class="signals-table">
-        <thead>
-          <tr>
-            <th>Versión</th><th>Lado</th><th>P(↑)</th><th>Confianza</th><th>Thr efectivo</th>
-            <th>Mult</th><th>TP</th><th>Conf?</th><th>DZ?</th><th>Opera</th>
-          </tr>
-        </thead>
-        <tbody>${sigRows}</tbody>
-      </table>
+      <div style="background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:14px">
+        <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">GARCH vol</div>
+        <div class="mono" style="font-size:18px;margin-top:6px">${(d.garch_vol_t1 * 100).toFixed(3)}%</div>
+      </div>
+      <div style="background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:14px">
+        <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">P(deadzone)</div>
+        <div class="mono" style="font-size:18px;margin-top:6px">${d.p_deadzone !== null ? (d.p_deadzone * 100).toFixed(1) + '%' : '—'}</div>
+      </div>
+      <div style="background:var(--bg-2);border:1px solid var(--line);border-radius:8px;padding:14px">
+        <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Cierre</div>
+        <div class="mono" style="font-size:18px;margin-top:6px">$${fmt.price(d.current_candle.close)}</div>
+      </div>
     </div>
 
-    <div class="grid grid-2" style="margin-top:20px">
-      <div class="card">
-        <div class="card-title">Vela actual</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
-          <div>
-            <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Cierre</div>
-            <div style="font-family:'DM Mono',monospace;font-size:22px;margin-top:4px">$${fmt.price(d.current_candle.close)}</div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Timestamp</div>
-            <div class="mono" style="font-size:14px;margin-top:8px">${d.current_candle.time.slice(11, 19)} UTC</div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">High</div>
-            <div class="mono" style="font-size:14px;margin-top:8px">$${fmt.price(d.current_candle.high)}</div>
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">Low</div>
-            <div class="mono" style="font-size:14px;margin-top:8px">$${fmt.price(d.current_candle.low)}</div>
-          </div>
-        </div>
-      </div>
+    <div class="card-title">Predicciones por experto</div>
+    <div class="tfg-pred-grid" style="margin-bottom:24px">${predsHtml}</div>
 
-      <div class="card">
-        <div class="card-title">Configuración del pipeline</div>
-        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
-          <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Coste round-trip</span><span class="mono">${(d.config.cost_rt * 100).toFixed(2)}%</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Deadzone threshold (ret)</span><span class="mono">±${(d.config.deadzone_thr_ret * 100).toFixed(2)}%</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Confidence boost</span><span class="mono">+${(d.config.conf_boost * 100).toFixed(0)}%</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">TP mínimo absoluto</span><span class="mono">${(d.config.min_tp_abs * 100).toFixed(3)}%</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Stop loss</span><span class="mono">desactivado</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Nº de features</span><span class="mono">${d.feature_count}</span></div>
-        </div>
+    <div class="card-title">Evaluación de señales <span class="tag">conf_boost +${(d.config.conf_boost * 100).toFixed(0)}%</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">${sigCards}</div>
+
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Pipeline</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;font-size:12px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Coste RT</span><span class="mono">${(d.config.cost_rt * 100).toFixed(2)}%</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Deadzone thr</span><span class="mono">±${(d.config.deadzone_thr_ret * 100).toFixed(2)}%</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">TP min</span><span class="mono">${(d.config.min_tp_abs * 100).toFixed(3)}%</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">SL</span><span class="mono">off</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Features</span><span class="mono">${d.feature_count}</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--txt-2)">Vela</span><span class="mono">${d.current_candle.time.slice(11, 16)} UTC</span></div>
       </div>
     </div>
   `;
@@ -1392,30 +1404,61 @@ function openAssetModal(category, code, displayName) {
       ${kvB("5Y", fiveYPct !== null ? '<span class="' + fmt.cls(fiveYPct) + '">' + fmt.pct(fiveYPct) + '</span>' : '—')}
       ${kvB("Datos", bars.length + " barras")}
     </div>
-    <div id="asset-detail-chart" style="width:100%;height:360px;margin:20px 0"></div>
+    <div style="display:flex;gap:6px;margin-bottom:12px" id="asset-period-tabs">
+      <button class="chart-tab" data-days="30">1M</button>
+      <button class="chart-tab" data-days="90">3M</button>
+      <button class="chart-tab" data-days="180">6M</button>
+      <button class="chart-tab" data-days="365">1Y</button>
+      <button class="chart-tab active" data-days="0">5Y</button>
+    </div>
+    <div id="asset-detail-chart" style="width:100%;height:360px;margin:0 0 20px"></div>
   `;
 
+  // Store bars for period filtering
+  window._assetBars = bars;
+
+  function renderAssetChart(days) {
+    let filtered = bars;
+    if (days > 0) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      const cutStr = cutoff.toISOString().slice(0, 10);
+      filtered = bars.filter(b => b.date >= cutStr);
+    }
+    setTimeout(() => {
+      const container = document.getElementById("asset-detail-chart");
+      if (!container) return;
+      container.innerHTML = "";
+      if (assetDetailChart) { assetDetailChart.remove(); assetDetailChart = null; }
+      assetDetailChart = LightweightCharts.createChart(container, {
+        layout: { background: { color: "transparent" }, textColor: "#b8bcc6" },
+        grid:   { vertLines: { color: "#1f232a" }, horzLines: { color: "#1f232a" } },
+        timeScale: { borderColor: "#262a32", timeVisible: false },
+        rightPriceScale: { borderColor: "#262a32" },
+        crosshair: { mode: 0 },
+        height: 360,
+        width: container.clientWidth,
+      });
+      assetDetailSeries = assetDetailChart.addAreaSeries({
+        topColor: "rgba(0,208,156,0.4)", bottomColor: "rgba(0,208,156,0.04)",
+        lineColor: "#00d09c", lineWidth: 2,
+      });
+      const chartData = filtered.map(b => ({ time: b.date, value: b.close })).filter(x => x.value != null);
+      if (chartData.length) assetDetailSeries.setData(chartData);
+    }, 30);
+  }
+
+  renderAssetChart(0);
+
   setTimeout(() => {
-    const container = document.getElementById("asset-detail-chart");
-    if (!container) return;
-    container.innerHTML = "";
-    if (assetDetailChart) { assetDetailChart.remove(); assetDetailChart = null; }
-    assetDetailChart = LightweightCharts.createChart(container, {
-      layout: { background: { color: "transparent" }, textColor: "#b8bcc6" },
-      grid:   { vertLines: { color: "#1f232a" }, horzLines: { color: "#1f232a" } },
-      timeScale: { borderColor: "#262a32", timeVisible: false },
-      rightPriceScale: { borderColor: "#262a32" },
-      crosshair: { mode: 0 },
-      height: 360,
-      width: container.clientWidth,
+    document.querySelectorAll("#asset-period-tabs .chart-tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#asset-period-tabs .chart-tab").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        renderAssetChart(parseInt(btn.dataset.days) || 0);
+      });
     });
-    assetDetailSeries = assetDetailChart.addAreaSeries({
-      topColor: "rgba(0,208,156,0.4)", bottomColor: "rgba(0,208,156,0.04)",
-      lineColor: "#00d09c", lineWidth: 2,
-    });
-    const chartData = bars.map(b => ({ time: b.date, value: b.close })).filter(x => x.value != null);
-    if (chartData.length) assetDetailSeries.setData(chartData);
-  }, 30);
+  }, 50);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
