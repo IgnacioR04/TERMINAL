@@ -104,17 +104,17 @@ def fetch_crypto_24h():
         for pair, cg_id in CRYPTO_IDS.items():
             if cg_id in data:
                 d = data[cg_id]
-                price = float(d.get("current_price", 0))
-                change = float(d.get("price_change_24h", 0))
-                change_pct = float(d.get("price_change_percentage_24h", 0))
+                price = float(d.get("current_price") or 0)
+                change = float(d.get("price_change_24h") or 0)
+                change_pct = float(d.get("price_change_percentage_24h") or 0)
                 out[pair] = {
                     "price":      price,
                     "change":     change,
                     "change_pct": change_pct,
-                    "high":       float(d.get("high_24h", 0) or 0),
-                    "low":        float(d.get("low_24h", 0) or 0),
-                    "volume":     float(d.get("total_volume", 0) or 0),
-                    "quote_vol":  float(d.get("total_volume", 0) or 0),
+                    "high":       float(d.get("high_24h") or 0),
+                    "low":        float(d.get("low_24h") or 0),
+                    "volume":     float(d.get("total_volume") or 0),
+                    "quote_vol":  float(d.get("total_volume") or 0),
                 }
     except Exception as e:
         print(f"Error CoinGecko 24h. {e}")
