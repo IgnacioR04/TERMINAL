@@ -72,15 +72,17 @@ def check_models():
 # Descarga de datos
 # ─────────────────────────────────────────────────────────────────────
 
-def fetch_klines_binance(symbol, interval="1h", limit=1000):
-    """Velas de Binance. Devuelve DataFrame con datetime UTC index."""
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol, "interval": interval, "limit": limit}
+def fetch_klines_bybit(symbol, interval="1h", limit=1000):
+    """Velas de Bybit. Devuelve DataFrame con datetime UTC index."""
+    interval_map = {"1h": "60", "5m": "5", "1d": "D"}
+    bybit_interval = interval_map.get(interval, "60")
+    url = "https://api.bybit.com/v5/market/kline"
+    params = {"category": "spot", "symbol": symbol, "interval": bybit_interval, "limit": limit}
     r = requests.get(url, params=params, timeout=15)
     r.raise_for_status()
-    data = r.json()
+    raw = r.json().get("result", {}).get("list", [])
     rows = []
-    for k in data:
+    for k in raw:
         rows.append({
             "date":   pd.to_datetime(int(k[0]), unit="ms", utc=True),
             "open":   float(k[1]),
@@ -96,8 +98,8 @@ def fetch_klines_binance(symbol, interval="1h", limit=1000):
 
 def fetch_btc_eth_hourly(limit=1000):
     """BTC y ETH 1h alineados. Necesitamos al menos 720 velas (30 dias) para zscore FG."""
-    btc = fetch_klines_binance("BTCUSDT", "1h", limit).add_prefix("btc_")
-    eth = fetch_klines_binance("ETHUSDT", "1h", limit).add_prefix("eth_")
+    btc = fetch_klines_bybit("BTCUSDT", "1h", limit).add_prefix("btc_")
+    eth = fetch_klines_bybit("ETHUSDT", "1h", limit).add_prefix("eth_")
     return btc.join(eth, how="inner")
 
 
