@@ -588,6 +588,13 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--line-2); }
 
+.quote-sparkline {
+  margin-top: 8px;
+  height: 30px;
+  width: 100%;
+}
+.quote-sparkline svg { width: 100%; height: 30px; }
+
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
   .sidebar { position: fixed; left: -240px; transition: left 0.2s ease; z-index: 20; }
@@ -780,6 +787,14 @@ body {
   </div>
 </div>
 
+<!-- Modal genérico para macro/commodities/crypto -->
+<div class="modal-overlay" id="asset-modal">
+  <div class="modal">
+    <div class="modal-close" id="asset-modal-close">×</div>
+    <div id="asset-modal-content"></div>
+  </div>
+</div>
+
 <script src="stocks.js"></script>
 <script>
 // ──────────────────────────────────────────────────────────────────────
@@ -943,12 +958,12 @@ function renderLive() {
   }
 
   // Commodities and FX
-  renderQuoteGrid(d.commodities || {}, "commod-grid", commodNames());
-  renderQuoteGrid(d.forex || {}, "forex-grid", forexNames());
+  renderQuoteGrid(d.commodities || {}, "commod-grid", commodNames(), "commodities");
+  renderQuoteGrid(d.forex || {}, "forex-grid", forexNames(), "forex");
 
   // Indices and bonds
-  renderQuoteGrid(d.indices || {}, "indices-grid", indicesNames());
-  renderQuoteGrid(d.bonds || {}, "bonds-grid", bondsNames());
+  renderQuoteGrid(d.indices || {}, "indices-grid", indicesNames(), "indices");
+  renderQuoteGrid(d.bonds || {}, "bonds-grid", bondsNames(), "bonds");
 
   // News
   renderNews(d.news || []);
@@ -967,35 +982,70 @@ function renderCryptoGrid(crypto, containerId, limit) {
     AVAXUSDT: "Avalanche", DOGEUSDT: "Dogecoin", LINKUSDT: "Chainlink",
     DOTUSDT: "Polkadot", MATICUSDT: "Polygon", ATOMUSDT: "Cosmos",
   };
+  const PAIR_TO_HIST = {
+    BTCUSDT: "BTC", ETHUSDT: "ETH", SOLUSDT: "SOL",
+    BNBUSDT: "BNB", XRPUSDT: "XRP", ADAUSDT: "ADA",
+    AVAXUSDT: "AVAX", DOGEUSDT: "DOGE", LINKUSDT: "LINK",
+    DOTUSDT: "DOT",
+  };
   const el = document.getElementById(containerId);
   if (!el) return;
   const entries = Object.entries(crypto);
   const slice = limit ? entries.slice(0, limit) : entries;
-  el.innerHTML = slice.map(([pair, d]) => `
-    <div class="quote-card">
+  el.innerHTML = slice.map(([pair, d]) => {
+    const histCode = PAIR_TO_HIST[pair];
+    const spark = histCode ? buildSparklineSVG("crypto", histCode) : "";
+    return `
+    <div class="quote-card" data-category="crypto" data-code="${histCode || ""}" onclick="openAssetModal('crypto','${histCode || ""}','${PAIR_NAMES[pair] || pair}')">
       <div class="quote-name">${PAIR_NAMES[pair] || pair} <span style="color:var(--txt-2);font-size:11px">${pair}</span></div>
       <div class="quote-price">$${fmt.price(d.price, d.price < 1 ? 4 : 2)}</div>
       <div class="quote-change ${fmt.cls(d.change_pct)}">${fmt.pct(d.change_pct)}</div>
       <div class="quote-meta">Vol 24h: ${fmt.compact(d.quote_vol)}</div>
+      ${spark ? '<div class="quote-sparkline">' + spark + '</div>' : ''}
     </div>
-  `).join("");
+  `}).join("");
 }
 
-function renderQuoteGrid(quotes, containerId, nameMap) {
+function renderQuoteGrid(quotes, containerId, nameMap, category) {
   const el = document.getElementById(containerId);
   if (!el) return;
   el.innerHTML = Object.entries(quotes).map(([code, d]) => {
     if (!d) {
       return `<div class="quote-card"><div class="quote-name">${nameMap[code] || code}</div><div class="quote-price neutral">—</div></div>`;
     }
+    const spark = buildSparklineSVG(category, code);
     return `
-      <div class="quote-card">
+      <div class="quote-card" onclick="openAssetModal('${category}','${code}','${nameMap[code] || code}')">
         <div class="quote-name">${nameMap[code] || code}</div>
         <div class="quote-price">${fmt.price(d.price, 2)}</div>
         <div class="quote-change ${fmt.cls(d.change_pct)}">${fmt.pct(d.change_pct)}</div>
+        ${spark ? '<div class="quote-sparkline">' + spark + '</div>' : ''}
       </div>
     `;
   }).join("");
+}
+
+function buildSparklineSVG(category, code) {
+  if (!STATE.historical || !STATE.historical.categories) return "";
+  const cat = STATE.historical.categories[category];
+  if (!cat || !cat[code] || !cat[code].bars) return "";
+  const bars = cat[code].bars;
+  const recent = bars.slice(-30);
+  if (recent.length < 2) return "";
+  const closes = recent.map(b => b.close).filter(v => v != null);
+  if (closes.length < 2) return "";
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const range = max - min || 1;
+  const w = 120;
+  const h = 28;
+  const pts = closes.map((v, i) => {
+    const x = (i / (closes.length - 1)) * w;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    return x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  const color = closes[closes.length - 1] >= closes[0] ? "var(--accent)" : "var(--red)";
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
 }
 
 function commodNames() {
@@ -1235,6 +1285,106 @@ function renderTFG() {
     </div>
   `;
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// Asset detail modal (Macro, Commodities, Crypto, FX, Bonds)
+// ──────────────────────────────────────────────────────────────────────
+let assetDetailChart = null;
+let assetDetailSeries = null;
+
+function openAssetModal(category, code, displayName) {
+  if (!STATE.historical || !STATE.historical.categories) return;
+  const cat = STATE.historical.categories[category];
+  if (!cat || !cat[code]) return;
+  const asset = cat[code];
+  const bars = asset.bars || [];
+  if (!bars.length) return;
+
+  const modal = document.getElementById("asset-modal");
+  const content = document.getElementById("asset-modal-content");
+  modal.classList.add("show");
+
+  const closes = bars.map(b => b.close).filter(v => v != null);
+  const allTimeHigh = Math.max(...closes);
+  const allTimeLow = Math.min(...closes);
+  const lastClose = closes[closes.length - 1];
+
+  // YTD
+  const now = new Date();
+  const yearStart = now.getFullYear() + "-01-01";
+  const ytdBar = bars.find(b => b.date >= yearStart);
+  const ytdStart = ytdBar ? ytdBar.close : null;
+  const ytdPct = (ytdStart && ytdStart !== 0) ? ((lastClose - ytdStart) / ytdStart * 100) : null;
+
+  // 1Y
+  const oneYearAgo = new Date(now);
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const oneYStr = oneYearAgo.toISOString().slice(0, 10);
+  const oneYBar = bars.find(b => b.date >= oneYStr);
+  const oneYStart = oneYBar ? oneYBar.close : null;
+  const oneYPct = (oneYStart && oneYStart !== 0) ? ((lastClose - oneYStart) / oneYStart * 100) : null;
+
+  // 5Y (primer dato)
+  const fiveYStart = closes[0];
+  const fiveYPct = (fiveYStart && fiveYStart !== 0) ? ((lastClose - fiveYStart) / fiveYStart * 100) : null;
+
+  function kvB(label, value) {
+    return `<div style="background:var(--bg-2);border:1px solid var(--line);padding:14px;border-radius:6px">
+      <div style="font-size:10px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.12em">${label}</div>
+      <div style="font-family:'Geist Mono',monospace;font-size:16px;margin-top:6px">${value}</div>
+    </div>`;
+  }
+
+  content.innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+      <div style="font-family:'Fraunces',serif;font-size:32px;font-weight:600">${escapeHtml(displayName)}</div>
+      <span style="background:var(--bg-3);padding:4px 10px;border-radius:4px;font-size:11px">${code}</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:14px;margin:18px 0">
+      <div style="font-family:'Geist Mono',monospace;font-size:42px;font-weight:600">${fmt.price(lastClose)}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">
+      ${kvB("ATH", fmt.price(allTimeHigh))}
+      ${kvB("ATL", fmt.price(allTimeLow))}
+      ${kvB("YTD", ytdPct !== null ? '<span class="' + fmt.cls(ytdPct) + '">' + fmt.pct(ytdPct) + '</span>' : '—')}
+      ${kvB("1Y", oneYPct !== null ? '<span class="' + fmt.cls(oneYPct) + '">' + fmt.pct(oneYPct) + '</span>' : '—')}
+      ${kvB("5Y", fiveYPct !== null ? '<span class="' + fmt.cls(fiveYPct) + '">' + fmt.pct(fiveYPct) + '</span>' : '—')}
+      ${kvB("Datos", bars.length + " barras")}
+    </div>
+    <div id="asset-detail-chart" style="width:100%;height:360px;margin:20px 0"></div>
+  `;
+
+  setTimeout(() => {
+    const container = document.getElementById("asset-detail-chart");
+    if (!container) return;
+    container.innerHTML = "";
+    if (assetDetailChart) { assetDetailChart.remove(); assetDetailChart = null; }
+    assetDetailChart = LightweightCharts.createChart(container, {
+      layout: { background: { color: "transparent" }, textColor: "#b8bcc6" },
+      grid:   { vertLines: { color: "#1f232a" }, horzLines: { color: "#1f232a" } },
+      timeScale: { borderColor: "#262a32", timeVisible: false },
+      rightPriceScale: { borderColor: "#262a32" },
+      crosshair: { mode: 0 },
+      height: 360,
+      width: container.clientWidth,
+    });
+    assetDetailSeries = assetDetailChart.addAreaSeries({
+      topColor: "rgba(0,208,156,0.4)", bottomColor: "rgba(0,208,156,0.04)",
+      lineColor: "#00d09c", lineWidth: 2,
+    });
+    const chartData = bars.map(b => ({ time: b.date, value: b.close })).filter(x => x.value != null);
+    if (chartData.length) assetDetailSeries.setData(chartData);
+  }, 30);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const am = document.getElementById("asset-modal");
+  const amc = document.getElementById("asset-modal-close");
+  if (amc) amc.addEventListener("click", () => am.classList.remove("show"));
+  if (am) am.addEventListener("click", (e) => {
+    if (e.target === am) am.classList.remove("show");
+  });
+});
 
 // ──────────────────────────────────────────────────────────────────────
 // Init
