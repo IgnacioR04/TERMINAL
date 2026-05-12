@@ -72,34 +72,44 @@ def check_models():
 # Descarga de datos
 # ─────────────────────────────────────────────────────────────────────
 
-def fetch_klines_bybit(symbol, interval="1h", limit=1000):
-    """Velas de Bybit. Devuelve DataFrame con datetime UTC index."""
-    interval_map = {"1h": "60", "5m": "5", "1d": "D"}
-    bybit_interval = interval_map.get(interval, "60")
-    url = "https://api.bybit.com/v5/market/kline"
-    params = {"category": "spot", "symbol": symbol, "interval": bybit_interval, "limit": limit}
-    r = requests.get(url, params=params, timeout=15)
-    r.raise_for_status()
-    raw = r.json().get("result", {}).get("list", [])
+def fetch_klines_yfinance(symbol_yf, interval="1h", limit=1000):
+    """Velas via Yahoo Finance. Devuelve DataFrame con datetime UTC index."""
+    import yfinance as yf
+    if interval == "1h":
+        period = "30d"
+    else:
+        period = "7d"
+    t = yf.Ticker(symbol_yf)
+    df = t.history(period=period, interval=interval, auto_adjust=False)
+    if df is None or df.empty:
+        raise ValueError(f"Sin datos de {symbol_yf}")
+    df = df.reset_index()
+    date_col = "Datetime" if "Datetime" in df.columns else "Date"
     rows = []
-    for k in raw:
+    for _, row in df.iterrows():
+        d = row[date_col]
+        if d.tz is None:
+            d = d.tz_localize("UTC")
+        else:
+            d = d.tz_convert("UTC")
         rows.append({
-            "date":   pd.to_datetime(int(k[0]), unit="ms", utc=True),
-            "open":   float(k[1]),
-            "high":   float(k[2]),
-            "low":    float(k[3]),
-            "close":  float(k[4]),
-            "volume": float(k[5]),
+            "date":   d,
+            "open":   float(row.get("Open", 0)),
+            "high":   float(row.get("High", 0)),
+            "low":    float(row.get("Low", 0)),
+            "close":  float(row.get("Close", 0)),
+            "volume": float(row.get("Volume", 0)),
         })
-    df = pd.DataFrame(rows).set_index("date").sort_index()
-    # La ultima vela esta en curso. La eliminamos para que las features causales sean correctas.
-    return df.iloc[:-1]
+    out = pd.DataFrame(rows).set_index("date").sort_index()
+    # La ultima vela esta en curso. La eliminamos para causalidad estricta.
+    return out.iloc[:-1]
 
 
 def fetch_btc_eth_hourly(limit=1000):
-    """BTC y ETH 1h alineados. Necesitamos al menos 720 velas (30 dias) para zscore FG."""
-    btc = fetch_klines_bybit("BTCUSDT", "1h", limit).add_prefix("btc_")
-    eth = fetch_klines_bybit("ETHUSDT", "1h", limit).add_prefix("eth_")
+    """BTC y ETH 1h alineados via Yahoo Finance."""
+    btc = fetch_klines_yfinance("BTC-USD", "1h", limit).add_prefix("btc_")
+    eth = fetch_klines_yfinance("ETH-USD", "1h", limit).add_prefix("eth_")
+    return btc.join(eth, how="inner")
     return btc.join(eth, how="inner")
 
 
