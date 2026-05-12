@@ -9,16 +9,31 @@ from datetime import datetime, timezone
 
 import requests
 import yfinance as yf
+import pandas as pd
 import feedparser
 
 OUT_PATH = "data/live_data.json"
 
-# Cripto via Binance API publica. Es gratis y muy rapida.
-CRYPTO_PAIRS = [
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT",
-    "XRPUSDT", "ADAUSDT", "AVAXUSDT", "DOGEUSDT",
-    "LINKUSDT", "DOTUSDT", "MATICUSDT", "ATOMUSDT",
-]
+# Cripto via CoinGecko API publica (no requiere key, sin bloqueo geo).
+CRYPTO_IDS = {
+    "BTCUSDT":  "bitcoin",
+    "ETHUSDT":  "ethereum",
+    "SOLUSDT":  "solana",
+    "BNBUSDT":  "binancecoin",
+    "XRPUSDT":  "ripple",
+    "ADAUSDT":  "cardano",
+    "AVAXUSDT": "avalanche-2",
+    "DOGEUSDT": "dogecoin",
+    "LINKUSDT": "chainlink",
+    "DOTUSDT":  "polkadot",
+    "MATICUSDT":"matic-network",
+    "ATOMUSDT": "cosmos",
+}
+
+CRYPTO_YF = {
+    "BTCUSDT": "BTC-USD",
+    "ETHUSDT": "ETH-USD",
+}
 
 # Indices y FX via Yahoo Finance.
 YF_TICKERS = {
@@ -70,56 +85,73 @@ RSS_FEEDS = [
 ]
 
 
-def fetch_bybit_24h():
-    """Datos 24h de Bybit para todos los pares."""
+def fetch_crypto_24h():
+    """Datos 24h de cripto via CoinGecko."""
     out = {}
+    ids = ",".join(CRYPTO_IDS.values())
     try:
-        r = requests.get("https://api.bybit.com/v5/market/tickers?category=spot", timeout=15)
+        url = "https://api.coingecko.com/api/v3/coins/markets"
+        params = {
+            "vs_currency": "usd",
+            "ids": ids,
+            "order": "market_cap_desc",
+            "sparkline": "false",
+            "price_change_percentage": "24h",
+        }
+        r = requests.get(url, params=params, timeout=15)
         r.raise_for_status()
-        items = r.json().get("result", {}).get("list", [])
-        all_data = {item["symbol"]: item for item in items}
-        for pair in CRYPTO_PAIRS:
-            if pair in all_data:
-                d = all_data[pair]
-                price = float(d["lastPrice"])
-                prev = float(d["prevPrice24h"]) if d.get("prevPrice24h") else 0
-                change = price - prev
-                change_pct = (change / prev * 100) if prev != 0 else 0
+        data = {item["id"]: item for item in r.json()}
+        for pair, cg_id in CRYPTO_IDS.items():
+            if cg_id in data:
+                d = data[cg_id]
+                price = float(d.get("current_price", 0))
+                change = float(d.get("price_change_24h", 0))
+                change_pct = float(d.get("price_change_percentage_24h", 0))
                 out[pair] = {
-                    "price":     price,
-                    "change":    change,
+                    "price":      price,
+                    "change":     change,
                     "change_pct": change_pct,
-                    "high":      float(d["highPrice24h"]),
-                    "low":       float(d["lowPrice24h"]),
-                    "volume":    float(d["volume24h"]),
-                    "quote_vol": float(d["turnover24h"]),
+                    "high":       float(d.get("high_24h", 0) or 0),
+                    "low":        float(d.get("low_24h", 0) or 0),
+                    "volume":     float(d.get("total_volume", 0) or 0),
+                    "quote_vol":  float(d.get("total_volume", 0) or 0),
                 }
     except Exception as e:
-        print(f"Error Bybit 24h. {e}")
+        print(f"Error CoinGecko 24h. {e}")
     return out
 
 
 def fetch_btc_klines(interval="1h", limit=200):
-    """Velas de BTC via Bybit. limit max 1000."""
-    interval_map = {"1h": "60", "5m": "5"}
-    bybit_interval = interval_map.get(interval, "60")
+    """Velas de BTC via Yahoo Finance (funciona desde GitHub Actions)."""
+    yf_interval = interval
+    if interval == "1h":
+        period = "30d"
+    elif interval == "5m":
+        period = "5d"
+    else:
+        period = "7d"
     try:
-        url = "https://api.bybit.com/v5/market/kline"
-        params = {"category": "spot", "symbol": "BTCUSDT", "interval": bybit_interval, "limit": limit}
-        r = requests.get(url, params=params, timeout=15)
-        r.raise_for_status()
-        raw = r.json().get("result", {}).get("list", [])
+        t = yf.Ticker("BTC-USD")
+        df = t.history(period=period, interval=yf_interval, auto_adjust=False)
+        if df is None or df.empty:
+            return []
+        df = df.reset_index()
+        date_col = "Datetime" if "Datetime" in df.columns else "Date"
         out = []
-        for k in raw:
+        for _, row in df.iterrows():
+            d = row[date_col]
+            if hasattr(d, "timestamp"):
+                ts = int(d.timestamp())
+            else:
+                ts = int(pd.Timestamp(d).timestamp())
             out.append({
-                "time":   int(k[0]) // 1000,
-                "open":   float(k[1]),
-                "high":   float(k[2]),
-                "low":    float(k[3]),
-                "close":  float(k[4]),
-                "volume": float(k[5]),
+                "time":   ts,
+                "open":   float(row.get("Open", 0)),
+                "high":   float(row.get("High", 0)),
+                "low":    float(row.get("Low", 0)),
+                "close":  float(row.get("Close", 0)),
+                "volume": float(row.get("Volume", 0)),
             })
-        out.sort(key=lambda x: x["time"])
         return out
     except Exception as e:
         print(f"Error klines BTC. {e}")
@@ -270,8 +302,8 @@ def main():
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
-    print("Bybit 24h...")
-    out["crypto"] = fetch_bybit_24h()
+    print("CoinGecko 24h...")
+    out["crypto"] = fetch_crypto_24h()
     print(f"  {len(out['crypto'])} pares")
 
     print("BTC klines 1h...")
