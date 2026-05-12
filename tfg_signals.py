@@ -72,51 +72,46 @@ def check_models():
 # Descarga de datos
 # ─────────────────────────────────────────────────────────────────────
 
-def fetch_klines_yfinance(symbol_yf, interval="1h", limit=1000):
-    """Velas via Yahoo Finance. Devuelve DataFrame con datetime UTC index."""
-    import yfinance as yf
-    if interval == "1h":
-        period = "30d"
-    else:
-        period = "7d"
-    t = yf.Ticker(symbol_yf)
-    df = t.history(period=period, interval=interval, auto_adjust=False)
-    if df is None or df.empty:
-        raise ValueError(f"Sin datos de {symbol_yf}")
-    df = df.reset_index()
-    date_col = "Datetime" if "Datetime" in df.columns else "Date"
-    rows = []
-    for _, row in df.iterrows():
-        d = row[date_col]
-        if d.tz is None:
-            d = d.tz_localize("UTC")
-        else:
-            d = d.tz_convert("UTC")
-        rows.append({
-            "date":   d,
-            "open":   float(row.get("Open", 0)),
-            "high":   float(row.get("High", 0)),
-            "low":    float(row.get("Low", 0)),
-            "close":  float(row.get("Close", 0)),
-            "volume": float(row.get("Volume", 0)),
-        })
-    out = pd.DataFrame(rows).set_index("date").sort_index()
-    # La ultima vela esta en curso. La eliminamos para causalidad estricta.
-    return out.iloc[:-1]
+def load_csv_ohlcv(csv_path, limit=1000):
+    """Lee CSV horario local. Devuelve DataFrame con datetime UTC index."""
+    df = pd.read_csv(csv_path)
+    # Columna de fecha
+    date_col = "datetime_utc" if "datetime_utc" in df.columns else df.columns[0]
+    df["date"] = pd.to_datetime(df[date_col], utc=True)
+    df = df.set_index("date").sort_index()
+    # Renombrar columnas al formato estandar
+    df = df.rename(columns={
+        "open": "open", "high": "high", "low": "low",
+        "close": "close", "volume": "volume",
+    })
+    df = df[["open", "high", "low", "close", "volume"]].astype(float)
+    # Tomar las ultimas limit velas y eliminar la ultima (en curso)
+    df = df.iloc[-(limit + 1):-1]
+    return df
 
 
 def fetch_btc_eth_hourly(limit=1000):
-    """BTC y ETH 1h alineados via Yahoo Finance."""
-    btc = fetch_klines_yfinance("BTC-USD", "1h", limit).add_prefix("btc_")
-    eth = fetch_klines_yfinance("ETH-USD", "1h", limit).add_prefix("eth_")
-    return btc.join(eth, how="inner")
+    """BTC y ETH 1h desde CSVs locales."""
+    btc_path = "data/btc_1h.csv"
+    eth_path = "data/eth_1h.csv"
+    btc = load_csv_ohlcv(btc_path, limit).add_prefix("btc_")
+    eth = load_csv_ohlcv(eth_path, limit).add_prefix("eth_")
     return btc.join(eth, how="inner")
 
 
 def fetch_fear_greed_hourly():
     """
-    Fear and Greed de alternative.me. Es diario, lo reindexamos a 1h con ffill.
+    Fear and Greed desde CSV local. Si no existe, descarga de alternative.me.
     """
+    fg_path = "data/fg_1h.csv"
+    if os.path.exists(fg_path):
+        df = pd.read_csv(fg_path, index_col=0, parse_dates=True)
+        if df.index.tz is None:
+            df.index = df.index.tz_localize("UTC")
+        # Solo necesitamos la columna fg
+        if "fg" in df.columns:
+            return df[["fg"]]
+    # Fallback a API
     r = requests.get("https://api.alternative.me/fng/?limit=0", timeout=15)
     r.raise_for_status()
     data = r.json().get("data", [])
