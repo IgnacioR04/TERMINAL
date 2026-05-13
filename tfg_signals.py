@@ -450,6 +450,42 @@ def main():
         "p_highvol": [round(float(v), 4) for v in df_hmm_daily.tolist()],
     }
 
+    # Extender hmm_daily con datos históricos desde yfinance (hasta 2 años atras)
+    try:
+        import yfinance as yf
+        df_start = df.index.min()
+        hist_target = pd.Timestamp("2024-01-01", tz="UTC")
+        if df_start > hist_target:
+            print(f"Descargando BTC historico yfinance desde 2024-01-01 hasta {df_start.date()}...")
+            btc_hist = yf.download(
+                "BTC-USD", start="2024-01-01",
+                end=df_start.strftime("%Y-%m-%d"),
+                interval="1h", auto_adjust=True, progress=False
+            )
+            if btc_hist is not None and not btc_hist.empty:
+                btc_hist.index = pd.to_datetime(btc_hist.index, utc=True)
+                close_col = btc_hist.columns[btc_hist.columns.str.lower() == "close"][0] if any(btc_hist.columns.str.lower() == "close") else "Close"
+                btc_hist = btc_hist.sort_index()
+                logret_hist = np.log(btc_hist[close_col] / btc_hist[close_col].shift(1))
+                volreal_hist = logret_hist.rolling(24).std()
+                hist_median = float(volreal_hist.dropna().median())
+                fill_val = hist_median if np.isfinite(hist_median) else float(train_median)
+                obs_hist = volreal_hist.fillna(fill_val).values
+                obs_combined = np.concatenate([obs_hist, obs_all.values])
+                probs_ext = hmm_forward_filter_univariate(hmm_vol, obs_combined)
+                p_high_ext = probs_ext[:, high_state_raw]
+                idx_combined = btc_hist.index.tolist() + df.index.tolist()
+                sr_ext = pd.Series(p_high_ext, index=idx_combined)
+                sr_ext = sr_ext[~sr_ext.index.duplicated(keep="last")].sort_index()
+                df_ext_daily = sr_ext.resample("1D").mean().dropna()
+                hmm_daily_data = {
+                    "time": [int(ts.timestamp()) for ts in df_ext_daily.index],
+                    "p_highvol": [round(float(v), 4) for v in df_ext_daily.tolist()],
+                }
+                print(f"HMM extendido: {df_ext_daily.index[0].date()} → {df_ext_daily.index[-1].date()} ({len(hmm_daily_data['time'])} dias)")
+    except Exception as _hmm_ext_err:
+        print(f"HMM extension skipped: {_hmm_ext_err}")
+
     # GARCH one-step-ahead.
     print("Aplicando GARCH...")
     ret_scaled = df["btc_logret"].fillna(0.0).values * 100.0
