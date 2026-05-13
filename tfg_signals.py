@@ -493,11 +493,67 @@ def main():
     signals_sorted = sorted(signals, key=lambda s: s["confidence"], reverse=True)
 
     # Historico de probabilidades para grafico (ultimas 200 velas).
-    history_idx = df_clean.index[-200:].strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
-    history_price = df_clean["btc_close"].iloc[-200:].astype(float).tolist()
-    history_garch = df_clean["garch_vol_t1"].iloc[-200:].astype(float).tolist()
-    history_hmm_p_high = df_clean["hmm_p_highvol"].iloc[-200:].astype(float).tolist()
-    history_p_dz = df_clean["p_deadzone"].iloc[-200:].astype(float).tolist()
+    history_len = min(200, len(df_clean))
+    history_idx = df_clean.index[-history_len:].strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
+    history_price = df_clean["btc_close"].iloc[-history_len:].astype(float).tolist()
+    history_garch = df_clean["garch_vol_t1"].iloc[-history_len:].astype(float).tolist()
+    history_hmm_p_high = df_clean["hmm_p_highvol"].iloc[-history_len:].astype(float).tolist()
+    history_p_dz = df_clean["p_deadzone"].iloc[-history_len:].astype(float).tolist()
+
+    # Generar trades simulados para las ultimas 200 velas
+    # Un trade se abre cuando alguna version supera 60% de probabilidad
+    trades = []
+    for i in range(-history_len, 0):
+        row_i = df_clean.iloc[i]
+        t_str = df_clean.index[i].strftime("%Y-%m-%dT%H:%M:%SZ")
+        price_i = float(row_i["btc_close"])
+
+        # Evaluar cada version en esta vela
+        for v in VERSIONS:
+            prob_col = f"prob_cal_{v}"
+            if prob_col not in df_clean.columns:
+                continue
+            prob_v = float(df_clean[prob_col].iloc[i])
+            conf_v = max(prob_v, 1 - prob_v)
+            direction = "LONG" if prob_v >= 0.5 else "SHORT"
+
+            if conf_v < 0.60:
+                continue
+
+            # Evaluar filtros
+            p_dz_i = float(row_i["p_deadzone"]) if pd.notna(row_i["p_deadzone"]) else 1.0
+            p_high_i = float(row_i["hmm_p_highvol"])
+            regime_label = "highvol" if p_high_i > 0.5 else "lowvol"
+            side = direction
+            rule_key = (v, side.lower())
+
+            passes_conf = False
+            passes_dz = p_dz_i <= 0.50
+            multiplier = 0
+            tp_pct = None
+
+            if rule_key in adaptive_rules:
+                rule = adaptive_rules[rule_key]
+                thr = rule["conf_thr"] + CONF_BOOST
+                passes_conf = conf_v >= thr
+                multiplier = rule["multiplier"]
+                garch_i = float(row_i["garch_vol_t1"])
+                tp_pct = max(garch_i * multiplier, MIN_TP_ABS)
+
+            operates = passes_conf and passes_dz
+
+            trades.append({
+                "time": t_str,
+                "price": price_i,
+                "version": v,
+                "side": side,
+                "confidence": round(conf_v, 4),
+                "passes_conf": passes_conf,
+                "passes_dz": passes_dz,
+                "operates": operates,
+                "tp_pct": round(tp_pct, 6) if tp_pct else None,
+                "multiplier": round(multiplier, 2) if multiplier else None,
+            })
 
     out = {
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -544,6 +600,7 @@ def main():
             "p_deadzone":   history_p_dz,
             "predictions":  history_predictions,
         },
+        "trades": trades,
         "feature_count": len(feature_cols),
     }
 
