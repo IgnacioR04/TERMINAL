@@ -371,33 +371,55 @@ def append_hourly_csv(symbol_yf, csv_path, asset_name):
 
 
 def fetch_btc_daily_klines(limit=365):
-    """Velas diarias de BTC via Yahoo Finance para el dashboard."""
+    """Velas diarias de BTC desde CSV horario local (resample) + YFinance reciente."""
+    csv_path = "data/btc_1h.csv"
+    out = []
     try:
-        t = yf.Ticker("BTC-USD")
-        df = t.history(period="1y", interval="1d", auto_adjust=False)
-        if df is None or df.empty:
-            return []
-        df = df.reset_index()
-        date_col = "Date" if "Date" in df.columns else "Datetime"
-        out = []
-        for _, row in df.iterrows():
-            d = row[date_col]
-            if hasattr(d, "timestamp"):
-                ts = int(d.timestamp())
-            else:
-                ts = int(pd.Timestamp(d).timestamp())
-            out.append({
-                "time": ts,
-                "open": float(row.get("Open", 0)),
-                "high": float(row.get("High", 0)),
-                "low": float(row.get("Low", 0)),
-                "close": float(row.get("Close", 0)),
-                "volume": float(row.get("Volume", 0)),
-            })
-        return out
+        if os.path.exists(csv_path):
+            df = pd.read_csv(csv_path)
+            date_col = "datetime_utc" if "datetime_utc" in df.columns else df.columns[0]
+            df["dt"] = pd.to_datetime(df[date_col], utc=True)
+            df = df.set_index("dt").sort_index()
+            # Resample horario a diario
+            daily = df.resample("1D").agg({
+                "open": "first",
+                "high": "max",
+                "low": "min",
+                "close": "last",
+                "volume": "sum",
+            }).dropna()
+            for dt, row in daily.iterrows():
+                ts = int(dt.timestamp())
+                out.append({
+                    "time": ts,
+                    "open": float(row["open"]),
+                    "high": float(row["high"]),
+                    "low": float(row["low"]),
+                    "close": float(row["close"]),
+                    "volume": float(row["volume"]),
+                })
+            print(f"  CSV resample. {len(out)} dias desde {daily.index[0].date()} hasta {daily.index[-1].date()}")
+        else:
+            # Fallback Yahoo Finance
+            t = yf.Ticker("BTC-USD")
+            df = t.history(period="5y", interval="1d", auto_adjust=False)
+            if df is not None and not df.empty:
+                df = df.reset_index()
+                date_col = "Date" if "Date" in df.columns else "Datetime"
+                for _, row in df.iterrows():
+                    d = row[date_col]
+                    ts = int(d.timestamp()) if hasattr(d, "timestamp") else int(pd.Timestamp(d).timestamp())
+                    out.append({
+                        "time": ts,
+                        "open": float(row.get("Open", 0)),
+                        "high": float(row.get("High", 0)),
+                        "low": float(row.get("Low", 0)),
+                        "close": float(row.get("Close", 0)),
+                        "volume": float(row.get("Volume", 0)),
+                    })
     except Exception as e:
         print(f"Error klines BTC diario. {e}")
-        return []
+    return out
 
 
 def main():
