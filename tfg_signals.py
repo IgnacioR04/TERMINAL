@@ -492,28 +492,32 @@ def main():
     # Ranking del top-3 por confianza incluso si no operan.
     signals_sorted = sorted(signals, key=lambda s: s["confidence"], reverse=True)
 
-    # Historico de probabilidades para grafico (ultimas 200 velas).
-    history_len = min(200, len(df_clean))
-    history_idx = df_clean.index[-history_len:].strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
-    history_price = df_clean["btc_close"].iloc[-history_len:].astype(float).tolist()
-    history_garch = df_clean["garch_vol_t1"].iloc[-history_len:].astype(float).tolist()
-    history_hmm_p_high = df_clean["hmm_p_highvol"].iloc[-history_len:].astype(float).tolist()
-    history_p_dz = df_clean["p_deadzone"].iloc[-history_len:].astype(float).tolist()
+    # Historico desde el test set (2025-01-01) para grafico completo
+    test_start = pd.Timestamp("2025-01-01", tz="UTC")
+    df_test = df_clean[df_clean.index >= test_start]
+    if len(df_test) < 10:
+        df_test = df_clean  # fallback si no hay datos post 2025
+    history_len = len(df_test)
+    history_idx = df_test.index.strftime("%Y-%m-%dT%H:%M:%SZ").tolist()
+    history_price = df_test["btc_close"].astype(float).tolist()
+    history_garch = df_test["garch_vol_t1"].astype(float).tolist()
+    history_hmm_p_high = df_test["hmm_p_highvol"].astype(float).tolist()
+    history_p_dz = df_test["p_deadzone"].astype(float).tolist()
 
-    # Generar trades simulados para las ultimas 200 velas
+    # Generar trades simulados desde test set
     # Un trade se abre cuando alguna version supera 60% de probabilidad
     trades = []
-    for i in range(-history_len, 0):
-        row_i = df_clean.iloc[i]
-        t_str = df_clean.index[i].strftime("%Y-%m-%dT%H:%M:%SZ")
+    for idx in range(len(df_test)):
+        row_i = df_test.iloc[idx]
+        t_str = df_test.index[idx].strftime("%Y-%m-%dT%H:%M:%SZ")
         price_i = float(row_i["btc_close"])
 
         # Evaluar cada version en esta vela
         for v in VERSIONS:
             prob_col = f"prob_cal_{v}"
-            if prob_col not in df_clean.columns:
+            if prob_col not in df_test.columns:
                 continue
-            prob_v = float(df_clean[prob_col].iloc[i])
+            prob_v = float(df_test[prob_col].iloc[idx])
             conf_v = max(prob_v, 1 - prob_v)
             direction = "LONG" if prob_v >= 0.5 else "SHORT"
 
