@@ -2,39 +2,44 @@ name: Live data
 
 on:
   schedule:
-    - cron: "*/2 * * * *"
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 concurrency:
-  group: data-push
+  group: push-live
   cancel-in-progress: true
 
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
-      - run: pip install -r requirements.txt
-      - run: python fetch_live.py
-      - name: Fetch TFG signals
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch live data
+        run: python fetch_live.py
+
+      - name: Run TFG signals
         run: python tfg_signals.py
-        continue-on-error: true
-      - name: Commit
+
+      - name: Push data
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A data/live_data.json data/tfg_signals.json
-          git diff --staged --quiet || git commit -m "live data $(date -u +%Y-%m-%dT%H:%M)"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "live data $(date -u +%Y-%m-%dT%H:%M)"
           for i in 1 2 3 4 5; do
-            git pull --rebase origin main && git push && break
+            git pull --rebase origin main && git push origin main && exit 0
             echo "Push intento $i fallido. Reintento."
-            sleep 5
+            sleep $((i * 2))
           done
+          echo "Push failed after 5 retries"
+          exit 1
