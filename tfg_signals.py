@@ -478,6 +478,7 @@ def main():
     for version in VERSIONS:
         prob_raw, prob_cal = predict_calibrated(df_clean, version, all_experts, calibrators, feature_cols)
         prob_by_version_last[version] = float(prob_cal[-1])
+        df_clean[f"prob_cal_{version}"] = prob_cal
         history_predictions[version] = {
             "prob_raw": prob_raw[-200:].tolist(),
             "prob_cal": prob_cal[-200:].tolist(),
@@ -536,7 +537,7 @@ def main():
             p_high_i = float(row_i["hmm_p_highvol"])
             regime_label = "highvol" if p_high_i > 0.5 else "lowvol"
             side = direction
-            rule_key = (v, side.lower())
+            rule_key = (v, side)
 
             passes_conf = False
             passes_dz = p_dz_i <= 0.50
