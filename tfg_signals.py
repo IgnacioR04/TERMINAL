@@ -443,6 +443,13 @@ def main():
     df["hmm_p_highvol"] = probs_raw[:, high_state_raw]
     df["hmm_regime_vol"] = np.where(df["hmm_p_highvol"] > df["hmm_p_lowvol"], "highvol", "lowvol")
 
+    # HMM diario para overlay del dashboard (resampled de horario a diario, cubre todas las velas cargadas)
+    df_hmm_daily = df["hmm_p_highvol"].resample("1D").mean().dropna()
+    hmm_daily_data = {
+        "time": [int(ts.timestamp()) for ts in df_hmm_daily.index],
+        "p_highvol": [round(float(v), 4) for v in df_hmm_daily.tolist()],
+    }
+
     # GARCH one-step-ahead.
     print("Aplicando GARCH...")
     ret_scaled = df["btc_logret"].fillna(0.0).values * 100.0
@@ -596,6 +603,7 @@ def main():
             "min_tp_abs": MIN_TP_ABS,
             "sl_ratio": SL_RATIO,
         },
+        "hmm_daily": hmm_daily_data,
         "history": {
             "time":         history_idx,
             "btc_close":    history_price,
