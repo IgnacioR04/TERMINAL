@@ -72,7 +72,7 @@ def check_models():
 # Descarga de datos
 # ─────────────────────────────────────────────────────────────────────
 
-def load_csv_ohlcv(csv_path, limit=1000):
+def load_csv_ohlcv(csv_path, limit=5000):
     """Lee CSV horario local. Devuelve DataFrame con datetime UTC index."""
     df = pd.read_csv(csv_path)
     # Columna de fecha
@@ -90,7 +90,7 @@ def load_csv_ohlcv(csv_path, limit=1000):
     return df
 
 
-def fetch_btc_eth_hourly(limit=1000):
+def fetch_btc_eth_hourly(limit=5000):
     """BTC y ETH 1h desde CSVs locales."""
     btc_path = "data/btc_1h.csv"
     eth_path = "data/eth_1h.csv"
