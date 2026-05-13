@@ -1108,22 +1108,8 @@ function renderMainChart(d) {
     });
   }
 
-  // Combinar datos. Diarios de live + historicos de historical_data para BTC
-  let klines = d.btc_klines_daily || [];
-
-  // Si hay datos historicos de BTC en historical_data, los añadimos al principio
-  if (STATE.historical && STATE.historical.categories && STATE.historical.categories.crypto && STATE.historical.categories.crypto.BTC) {
-    const histBars = STATE.historical.categories.crypto.BTC.bars || [];
-    const histKlines = histBars.map(b => {
-      const ts = Math.floor(new Date(b.date + "T00:00:00Z").getTime() / 1000);
-      return { time: ts, open: b.open || b.close, high: b.high || b.close, low: b.low || b.close, close: b.close, volume: b.volume || 0 };
-    }).filter(k => k.close != null);
-
-    // Merge. Historicos primero, luego live (sin duplicar)
-    const liveStart = klines.length ? klines[0].time : Infinity;
-    const older = histKlines.filter(k => k.time < liveStart);
-    klines = [...older, ...klines];
-  }
+  // Datos diarios de BTC desde CSV resampled
+  const klines = d.btc_klines_daily || [];
 
   if (klines.length) {
     STATE.series.setData(klines.map(k => ({
