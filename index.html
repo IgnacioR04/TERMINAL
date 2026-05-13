@@ -1342,7 +1342,7 @@ function renderTFG() {
       </div>
     </div>
 
-    <div class="card-title" style="margin-top:24px">Precio BTC 1h + señales (últimas 200 velas)
+    <div class="card-title" style="margin-top:24px">Precio BTC 1h + señales (desde test set 2025)
       <span style="font-weight:400;font-size:11px;color:var(--txt-2);margin-left:12px">
         <span style="color:#00d09c">▲</span> LONG >60%
         <span style="color:#ff5c5c;margin-left:8px">▼</span> SHORT >60%
@@ -1391,9 +1391,11 @@ function renderTFG() {
         width: container.clientWidth,
       });
 
-      // Linea de precio
-      const lineSeries = tfgChart.addLineSeries({
-        color: "#b8bcc6",
+      // Area de precio con gradiente
+      const areaSeries = tfgChart.addAreaSeries({
+        topColor: "rgba(0,208,156,0.25)",
+        bottomColor: "rgba(0,208,156,0.02)",
+        lineColor: "#00d09c",
         lineWidth: 1.5,
         priceLineVisible: true,
         lastValueVisible: true,
@@ -1417,7 +1419,7 @@ function renderTFG() {
         const pHigh = hist.hmm_p_highvol[i] || 0;
         regimeData.push({ time: ts, value: 1, color: pHigh > 0.5 ? 'rgba(255,92,92,0.08)' : 'rgba(77,139,255,0.08)' });
       }
-      lineSeries.setData(lineData);
+      areaSeries.setData(lineData);
       regimeSeries.setData(regimeData);
 
       // Markers para TODOS los trades con >60% conf (no solo los que operan)
@@ -1440,7 +1442,7 @@ function renderTFG() {
           if (!byTime[m.time] || (m.size > byTime[m.time].size)) byTime[m.time] = m;
         });
         const unique = Object.values(byTime).sort((a, b) => a.time - b.time);
-        if (unique.length) lineSeries.setMarkers(unique);
+        if (unique.length) areaSeries.setMarkers(unique);
       }
     }, 50);
   }
