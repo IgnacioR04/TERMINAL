@@ -310,6 +310,96 @@ def fetch_economic_calendar():
     return out
 
 
+def append_hourly_csv(symbol_yf, csv_path, asset_name):
+    """Descarga velas 1h recientes de Yahoo Finance y las appendea al CSV si son nuevas."""
+    try:
+        t = yf.Ticker(symbol_yf)
+        df = t.history(period="7d", interval="1h", auto_adjust=False)
+        if df is None or df.empty:
+            print(f"  Sin datos nuevos de {symbol_yf}")
+            return 0
+        df = df.reset_index()
+        date_col = "Datetime" if "Datetime" in df.columns else "Date"
+
+        # Leer ultimo timestamp del CSV existente
+        last_ts = None
+        if os.path.exists(csv_path):
+            existing = pd.read_csv(csv_path)
+            dt_col = "datetime_utc" if "datetime_utc" in existing.columns else existing.columns[0]
+            if len(existing) > 0:
+                last_ts = pd.to_datetime(existing[dt_col].iloc[-1], utc=True)
+
+        new_rows = []
+        for _, row in df.iterrows():
+            d = row[date_col]
+            if d.tz is None:
+                d = d.tz_localize("UTC")
+            else:
+                d = d.tz_convert("UTC")
+            if last_ts is not None and d <= last_ts:
+                continue
+            new_rows.append({
+                "datetime_utc": d.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "open": float(row.get("Open", 0)),
+                "high": float(row.get("High", 0)),
+                "low": float(row.get("Low", 0)),
+                "close": float(row.get("Close", 0)),
+                "volume": float(row.get("Volume", 0)),
+                "asset": asset_name,
+                "symbol_requested": symbol_yf,
+                "symbol_used": symbol_yf,
+                "provider": "yfinance",
+            })
+
+        if not new_rows:
+            return 0
+
+        # Eliminar la ultima fila (vela en curso, incompleta)
+        new_rows = new_rows[:-1]
+        if not new_rows:
+            return 0
+
+        new_df = pd.DataFrame(new_rows)
+        if os.path.exists(csv_path):
+            new_df.to_csv(csv_path, mode="a", header=False, index=False)
+        else:
+            new_df.to_csv(csv_path, index=False)
+        return len(new_rows)
+    except Exception as e:
+        print(f"  Error append {symbol_yf}. {e}")
+        return 0
+
+
+def fetch_btc_daily_klines(limit=365):
+    """Velas diarias de BTC via Yahoo Finance para el dashboard."""
+    try:
+        t = yf.Ticker("BTC-USD")
+        df = t.history(period="1y", interval="1d", auto_adjust=False)
+        if df is None or df.empty:
+            return []
+        df = df.reset_index()
+        date_col = "Date" if "Date" in df.columns else "Datetime"
+        out = []
+        for _, row in df.iterrows():
+            d = row[date_col]
+            if hasattr(d, "timestamp"):
+                ts = int(d.timestamp())
+            else:
+                ts = int(pd.Timestamp(d).timestamp())
+            out.append({
+                "time": ts,
+                "open": float(row.get("Open", 0)),
+                "high": float(row.get("High", 0)),
+                "low": float(row.get("Low", 0)),
+                "close": float(row.get("Close", 0)),
+                "volume": float(row.get("Volume", 0)),
+            })
+        return out
+    except Exception as e:
+        print(f"Error klines BTC diario. {e}")
+        return []
+
+
 def main():
     out = {
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -319,13 +409,22 @@ def main():
     out["crypto"] = fetch_crypto_24h()
     print(f"  {len(out['crypto'])} pares")
 
-    print("BTC klines 1h...")
-    out["btc_klines_1h"] = fetch_btc_klines("1h", 200)
-    print(f"  {len(out['btc_klines_1h'])} velas")
+    print("BTC klines diario (dashboard)...")
+    out["btc_klines_daily"] = fetch_btc_daily_klines()
+    print(f"  {len(out['btc_klines_daily'])} velas diarias")
 
     print("BTC klines 5m...")
     out["btc_klines_5m"] = fetch_btc_klines("5m", 120)
-    print(f"  {len(out['btc_klines_5m'])} velas")
+    print(f"  {len(out['btc_klines_5m'])} velas 5m")
+
+    # Append nuevas velas 1h a los CSV
+    print("Actualizando CSV BTC 1h...")
+    n = append_hourly_csv("BTC-USD", "data/btc_1h.csv", "btc")
+    print(f"  {n} velas nuevas")
+
+    print("Actualizando CSV ETH 1h...")
+    n = append_hourly_csv("ETH-USD", "data/eth_1h.csv", "eth")
+    print(f"  {n} velas nuevas")
 
     for category, tickers in YF_TICKERS.items():
         print(f"YF {category}...")
