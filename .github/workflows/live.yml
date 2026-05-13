@@ -31,7 +31,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/live_data.json data/tfg_signals.json
+          git add -A data/live_data.json data/tfg_signals.json
           git diff --staged --quiet || git commit -m "live data $(date -u +%Y-%m-%dT%H:%M)"
           for i in 1 2 3 4 5; do
             git pull --rebase origin main && git push && break
