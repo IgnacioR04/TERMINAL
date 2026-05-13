@@ -700,11 +700,12 @@ body {
       <div class="chart-box">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <div class="chart-tabs" id="main-chart-tabs">
-            <button class="chart-tab" data-period="7" data-interval="1d">7D</button>
-            <button class="chart-tab" data-period="30" data-interval="1d">30D</button>
-            <button class="chart-tab" data-period="90" data-interval="1d">90D</button>
-            <button class="chart-tab active" data-period="365" data-interval="1d">1Y</button>
-            <button class="chart-tab" data-period="5" data-interval="5m">5M</button>
+            <button class="chart-tab" data-zoom="7">7D</button>
+            <button class="chart-tab active" data-zoom="30">30D</button>
+            <button class="chart-tab" data-zoom="90">90D</button>
+            <button class="chart-tab" data-zoom="365">1Y</button>
+            <button class="chart-tab" data-zoom="1825">5Y</button>
+            <button class="chart-tab" data-zoom="0">MAX</button>
           </div>
           <div style="display:flex;gap:16px;font-size:11px;color:var(--txt-2)">
             <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:rgba(77,139,255,0.3);margin-right:4px;vertical-align:middle"></span>Low vol</span>
@@ -818,8 +819,7 @@ const STATE = {
   chart: null,
   series: null,
   regimeSeries: null,
-  chartInterval: "1d",
-  chartPeriod: 365,
+  chartZoom: 30,
 };
 
 // ──────────────────────────────────────────────────────────────────────
@@ -1084,7 +1084,7 @@ function renderMainChart(d) {
     STATE.chart = LightweightCharts.createChart(container, {
       layout: { background: { color: "transparent" }, textColor: "#b8bcc6" },
       grid:   { vertLines: { color: "#1f232a" }, horzLines: { color: "#1f232a" } },
-      timeScale: { borderColor: "#262a32", timeVisible: true, secondsVisible: false },
+      timeScale: { borderColor: "#262a32", timeVisible: false, secondsVisible: false },
       rightPriceScale: { borderColor: "#262a32" },
       crosshair: { mode: 0 },
       height: 380,
@@ -1095,70 +1095,77 @@ function renderMainChart(d) {
       borderUpColor: "#00d09c", borderDownColor: "#ff5c5c",
       wickUpColor: "#00d09c", wickDownColor: "#ff5c5c",
     });
+    // Regime background
+    STATE.regimeSeries = STATE.chart.addHistogramSeries({
+      priceScaleId: 'regime',
+      priceFormat: { type: 'volume' },
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    STATE.chart.priceScale('regime').applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
     window.addEventListener("resize", () => {
       STATE.chart.applyOptions({ width: container.clientWidth });
     });
   }
 
-  // Seleccionar datos segun intervalo
-  let klines;
-  if (STATE.chartInterval === "5m") {
-    klines = d.btc_klines_5m || [];
-  } else {
-    // 1h = datos diarios
-    klines = d.btc_klines_daily || [];
+  // Combinar datos. Diarios de live + historicos de historical_data para BTC
+  let klines = d.btc_klines_daily || [];
+
+  // Si hay datos historicos de BTC en historical_data, los añadimos al principio
+  if (STATE.historical && STATE.historical.categories && STATE.historical.categories.crypto && STATE.historical.categories.crypto.BTC) {
+    const histBars = STATE.historical.categories.crypto.BTC.bars || [];
+    const histKlines = histBars.map(b => {
+      const ts = Math.floor(new Date(b.date + "T00:00:00Z").getTime() / 1000);
+      return { time: ts, open: b.open || b.close, high: b.high || b.close, low: b.low || b.close, close: b.close, volume: b.volume || 0 };
+    }).filter(k => k.close != null);
+
+    // Merge. Historicos primero, luego live (sin duplicar)
+    const liveStart = klines.length ? klines[0].time : Infinity;
+    const older = histKlines.filter(k => k.time < liveStart);
+    klines = [...older, ...klines];
   }
 
-  if (klines && klines.length) {
-    if (STATE.chartPeriod > 0) {
-      const cutoff = Math.floor(Date.now() / 1000) - STATE.chartPeriod * 86400;
-      klines = klines.filter(k => k.time >= cutoff);
-    }
+  if (klines.length) {
     STATE.series.setData(klines.map(k => ({
       time: k.time, open: k.open, high: k.high, low: k.low, close: k.close,
     })));
   }
 
-  // Overlay de regimen HMM si hay datos TFG y estamos en 1h
-  if (STATE.chartInterval === "1h" && STATE.tfg && STATE.tfg.status === "ok" && STATE.tfg.history) {
-    if (!STATE.regimeSeries) {
-      STATE.regimeSeries = STATE.chart.addHistogramSeries({
-        priceScaleId: 'regime',
-        color: '#00d09c',
-        priceFormat: { type: 'volume' },
-        lastValueVisible: false,
-        priceLineVisible: false,
-      });
-      STATE.chart.priceScale('regime').applyOptions({
-        scaleMargins: { top: 0, bottom: 0 },
-        visible: false,
-      });
-    }
+  // Regime overlay desde TFG history
+  if (STATE.tfg && STATE.tfg.status === "ok" && STATE.tfg.history) {
     const hist = STATE.tfg.history;
     if (hist.time && hist.hmm_p_highvol) {
       const regimeData = hist.time.map((t, i) => {
         const ts = Math.floor(new Date(t).getTime() / 1000);
         const pHigh = hist.hmm_p_highvol[i] || 0;
-        const isHigh = pHigh > 0.5;
-        return {
-          time: ts,
-          value: 1,
-          color: isHigh ? 'rgba(255,92,92,0.08)' : 'rgba(77,139,255,0.08)',
-        };
+        return { time: ts, value: 1, color: pHigh > 0.5 ? 'rgba(255,92,92,0.08)' : 'rgba(77,139,255,0.08)' };
       });
       STATE.regimeSeries.setData(regimeData);
     }
   }
+
+  // Zoom visual
+  applyChartZoom(STATE.chartZoom);
 }
 
-// Interval tabs (1H / 5M)
+function applyChartZoom(days) {
+  if (!STATE.chart || !STATE.series) return;
+  if (days === 0) {
+    STATE.chart.timeScale().fitContent();
+  } else {
+    const now = Math.floor(Date.now() / 1000);
+    const from = now - days * 86400;
+    STATE.chart.timeScale().setVisibleRange({ from: from, to: now });
+  }
+}
+
+// Zoom tabs
 document.querySelectorAll("#main-chart-tabs .chart-tab").forEach(btn => {
   btn.addEventListener("click", () => {
     document.querySelectorAll("#main-chart-tabs .chart-tab").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    STATE.chartInterval = btn.dataset.interval;
-    STATE.chartPeriod = parseInt(btn.dataset.period) || 0;
-    if (STATE.live) renderMainChart(STATE.live);
+    STATE.chartZoom = parseInt(btn.dataset.zoom) || 0;
+    applyChartZoom(STATE.chartZoom);
   });
 });
 
@@ -1335,14 +1342,20 @@ function renderTFG() {
       </div>
     </div>
 
-    <div class="card-title" style="margin-top:24px">Chart + Trades (últimas 200 velas)</div>
+    <div class="card-title" style="margin-top:24px">Precio BTC 1h + señales (últimas 200 velas)
+      <span style="font-weight:400;font-size:11px;color:var(--txt-2);margin-left:12px">
+        <span style="color:#00d09c">▲</span> LONG >60%
+        <span style="color:#ff5c5c;margin-left:8px">▼</span> SHORT >60%
+        <span style="color:#f9b023;margin-left:8px">●</span> opera
+      </span>
+    </div>
     <div id="tfg-chart" style="width:100%;height:400px;margin-bottom:24px"></div>
 
     ${(d.trades && d.trades.length) ? `
-    <div class="card-title">Log de trades (conf > 60%)</div>
-    <div style="max-height:300px;overflow-y:auto">
+    <div class="card-title">Log de señales con >60% confianza (${d.trades.length} señales)</div>
+    <div style="max-height:400px;overflow-y:auto">
       <table class="signals-table" style="font-size:11px">
-        <thead><tr><th>Hora</th><th>Versión</th><th>Lado</th><th>Conf</th><th>TP</th><th>Conf?</th><th>DZ?</th><th>Opera</th></tr></thead>
+        <thead><tr><th>Hora UTC</th><th>Versión</th><th>Lado</th><th>Confianza</th><th>TP</th><th>Mult</th><th>Conf OK</th><th>DZ OK</th><th>Opera</th></tr></thead>
         <tbody>
           ${d.trades.map(t => `
             <tr style="${t.operates ? 'background:rgba(0,208,156,0.08)' : ''}">
@@ -1351,9 +1364,10 @@ function renderTFG() {
               <td><span class="pred-dir ${t.side === 'LONG' ? 'long' : 'short'}">${t.side}</span></td>
               <td class="mono">${(t.confidence * 100).toFixed(1)}%</td>
               <td class="mono">${t.tp_pct ? (t.tp_pct * 100).toFixed(3) + '%' : '—'}</td>
+              <td class="mono">${t.multiplier ? t.multiplier.toFixed(2) + 'x' : '—'}</td>
               <td class="${t.passes_conf ? 'pass-yes' : 'pass-no'}">${t.passes_conf ? '✓' : '✗'}</td>
               <td class="${t.passes_dz ? 'pass-yes' : 'pass-no'}">${t.passes_dz ? '✓' : '✗'}</td>
-              <td>${t.operates ? '<span class="pass-yes">SÍ</span>' : 'no'}</td>
+              <td>${t.operates ? '<span class="pass-yes" style="font-weight:700">SÍ</span>' : '<span style="color:var(--txt-2)">no</span>'}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -1362,7 +1376,7 @@ function renderTFG() {
     ` : ''}
   `;
 
-  // Renderizar chart TFG con trades
+  // Renderizar chart TFG
   if (d.history && d.history.time && d.history.btc_close) {
     setTimeout(() => {
       const container = document.getElementById("tfg-chart");
@@ -1377,11 +1391,12 @@ function renderTFG() {
         width: container.clientWidth,
       });
 
-      // Candlestick series
-      const candleSeries = tfgChart.addCandlestickSeries({
-        upColor: "#00d09c", downColor: "#ff5c5c",
-        borderUpColor: "#00d09c", borderDownColor: "#ff5c5c",
-        wickUpColor: "#00d09c", wickDownColor: "#ff5c5c",
+      // Linea de precio
+      const lineSeries = tfgChart.addLineSeries({
+        color: "#b8bcc6",
+        lineWidth: 1.5,
+        priceLineVisible: true,
+        lastValueVisible: true,
       });
 
       // Regime background
@@ -1394,32 +1409,38 @@ function renderTFG() {
       tfgChart.priceScale('regime_tfg').applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
 
       const hist = d.history;
-      const candles = [];
+      const lineData = [];
       const regimeData = [];
       for (let i = 0; i < hist.time.length; i++) {
         const ts = Math.floor(new Date(hist.time[i]).getTime() / 1000);
-        candles.push({ time: ts, open: hist.btc_close[i], high: hist.btc_close[i], low: hist.btc_close[i], close: hist.btc_close[i] });
+        lineData.push({ time: ts, value: hist.btc_close[i] });
         const pHigh = hist.hmm_p_highvol[i] || 0;
         regimeData.push({ time: ts, value: 1, color: pHigh > 0.5 ? 'rgba(255,92,92,0.08)' : 'rgba(77,139,255,0.08)' });
       }
-      // Use line series instead of candles since we only have close
-      candleSeries.setData(candles);
+      lineSeries.setData(lineData);
       regimeSeries.setData(regimeData);
 
-      // Trade markers
+      // Markers para TODOS los trades con >60% conf (no solo los que operan)
       if (d.trades && d.trades.length) {
-        const markers = d.trades.filter(t => t.operates).map(t => {
+        const markers = d.trades.map(t => {
           const ts = Math.floor(new Date(t.time).getTime() / 1000);
+          const isLong = t.side === 'LONG';
           return {
             time: ts,
-            position: t.side === 'LONG' ? 'belowBar' : 'aboveBar',
-            color: t.side === 'LONG' ? '#00d09c' : '#ff5c5c',
-            shape: t.side === 'LONG' ? 'arrowUp' : 'arrowDown',
-            text: t.version + ' ' + (t.confidence * 100).toFixed(0) + '%',
+            position: isLong ? 'belowBar' : 'aboveBar',
+            color: t.operates ? '#f9b023' : (isLong ? '#00d09c' : '#ff5c5c'),
+            shape: isLong ? 'arrowUp' : 'arrowDown',
+            text: t.operates ? t.version + ' OP' : '',
+            size: t.operates ? 2 : 1,
           };
         });
-        markers.sort((a, b) => a.time - b.time);
-        if (markers.length) candleSeries.setMarkers(markers);
+        // Deduplicate por timestamp (quitar duplicados, dejar el de mayor confianza)
+        const byTime = {};
+        markers.forEach(m => {
+          if (!byTime[m.time] || (m.size > byTime[m.time].size)) byTime[m.time] = m;
+        });
+        const unique = Object.values(byTime).sort((a, b) => a.time - b.time);
+        if (unique.length) lineSeries.setMarkers(unique);
       }
     }, 50);
   }
