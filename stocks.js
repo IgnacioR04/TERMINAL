@@ -7,6 +7,8 @@ window.StocksTab = (function () {
   let filtered = [];
   let currentRegion = "all";
   let currentSearch = "";
+  let sortCol = null;
+  let sortAsc  = true;
   let detailChart = null;
   let detailSeries = null;
 
@@ -55,6 +57,25 @@ window.StocksTab = (function () {
       }
       return true;
     });
+    sortCol = null; sortAsc = true; // reset sort on filter change
+    render();
+  }
+
+  function applySort() {
+    if (!sortCol) return;
+    filtered.sort((a, b) => {
+      let va = a[sortCol], vb = b[sortCol];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === "string") return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      return sortAsc ? va - vb : vb - va;
+    });
+  }
+
+  function sortBy(col) {
+    if (sortCol === col) { sortAsc = !sortAsc; } else { sortCol = col; sortAsc = true; }
+    applySort();
     render();
   }
 
@@ -65,43 +86,97 @@ window.StocksTab = (function () {
       return;
     }
 
+    const SECTOR_MAP = {
+      "Technology":             { color:"var(--accent-blue)",   bg:"var(--pill-blue-bg)" },
+      "Communication Services": { color:"var(--accent-blue)",   bg:"var(--pill-blue-bg)" },
+      "Health Care":            { color:"var(--accent-green)",  bg:"var(--pill-green-bg)" },
+      "Healthcare":             { color:"var(--accent-green)",  bg:"var(--pill-green-bg)" },
+      "Financials":             { color:"var(--accent-purple)", bg:"var(--pill-purple-bg)" },
+      "Financial Services":     { color:"var(--accent-purple)", bg:"var(--pill-purple-bg)" },
+      "Energy":                 { color:"var(--accent-orange)", bg:"var(--pill-orange-bg)" },
+      "Consumer Discretionary": { color:"var(--accent-teal)",   bg:"var(--pill-teal-bg)" },
+      "Consumer Staples":       { color:"var(--accent-teal)",   bg:"var(--pill-teal-bg)" },
+      "Materials":              { color:"var(--accent-orange)", bg:"var(--pill-orange-bg)" },
+      "Real Estate":            { color:"var(--accent-purple)", bg:"var(--pill-purple-bg)" },
+    };
+    function sStyle(sec) {
+      return SECTOR_MAP[sec] || { color:"rgba(255,255,255,0.45)", bg:"rgba(255,255,255,0.04)" };
+    }
+
+    applySort();
+
     const rows = filtered.map(s => {
-      const chgCls = (s.change_pct == null) ? "neutral" : (s.change_pct >= 0 ? "up" : "down");
-      const chgTxt = s.change_pct == null ? "—" : (s.change_pct >= 0 ? "+" : "") + s.change_pct.toFixed(2) + "%";
-      const priceStr = s.price == null ? "—" : Number(s.price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      // Price
+      const priceHtml = (s.price == null)
+        ? `<span style="color:var(--text-muted)">—</span>`
+        : Number(s.price).toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
+
+      // Change pill / market-closed pill
+      let chgHtml;
+      if (s.change_pct == null) {
+        chgHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.3)"><i class="ti ti-clock" style="font-size:10px"></i>Cerrado</span>`;
+      } else {
+        const cls  = s.change_pct >= 0 ? "up" : "down";
+        const sign = s.change_pct >= 0 ? "+" : "";
+        chgHtml = `<span class="change-pill ${cls}">${sign}${s.change_pct.toFixed(2)}%</span>`;
+      }
+
+      // Div yield: value stored as % (e.g. 0.83 → 0.83%). Flag >15% in orange.
+      let dyHtml = "—";
+      if (s.dividend_yield != null) {
+        const dyVal = s.dividend_yield;
+        const dyStr = dyVal.toFixed(2) + "%";
+        dyHtml = dyVal > 15
+          ? `<span style="color:var(--accent-orange)">${dyStr}</span>`
+          : dyStr;
+      }
+
+      // Sector badge
+      const ss = sStyle(s.sector);
+      const sectorHtml = s.sector
+        ? `<span class="sector-badge" style="background:${ss.bg};color:${ss.color}">${escapeHtml(s.sector)}</span>`
+        : `<span style="color:var(--text-muted);font-size:11px">—</span>`;
+
       const mcap = compactNum(s.market_cap);
-      const pe = s.pe_ratio == null ? "—" : s.pe_ratio.toFixed(1);
-      const dy = (s.dividend_yield == null) ? "—" : (s.dividend_yield * 100).toFixed(2) + "%";
+      const pe   = s.pe_ratio == null ? "—" : s.pe_ratio.toFixed(1);
+
       return `
-        <tr data-ticker="${s.ticker}">
+        <tr data-ticker="${s.ticker}" style="cursor:pointer">
           <td class="ticker">${s.ticker}</td>
           <td class="name">${escapeHtml(s.name)}</td>
-          <td><span style="background:var(--bg-3);padding:2px 8px;border-radius:3px;font-size:11px">${escapeHtml(s.sector || "—")}</span></td>
-          <td><span style="font-size:11px;color:var(--txt-2);text-transform:uppercase;letter-spacing:0.1em">${s.region}</span></td>
-          <td class="num">${priceStr}</td>
-          <td class="num ${chgCls}">${chgTxt}</td>
+          <td>${sectorHtml}</td>
+          <td><span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.1em">${s.region}</span></td>
+          <td class="num">${priceHtml}</td>
+          <td class="num">${chgHtml}</td>
           <td class="num">${mcap}</td>
           <td class="num">${pe}</td>
-          <td class="num">${dy}</td>
-        </tr>
-      `;
+          <td class="num">${dyHtml}</td>
+        </tr>`;
     }).join("");
+
+    function thSort(col, label, rightAlign) {
+      const active = sortCol === col;
+      const icon   = active ? (sortAsc ? "arrow-up" : "arrow-down") : "arrows-sort";
+      const style  = rightAlign ? "text-align:right" : "";
+      return `<th class="th-sortable${active?" active":""}" style="${style}" onclick="window.StocksTab._sortBy('${col}')">${label} <i class="ti ti-${icon}"></i></th>`;
+    }
 
     container.innerHTML = `
       <table class="stocks-table">
         <thead>
           <tr>
-            <th>Ticker</th><th>Empresa</th><th>Sector</th><th>Región</th>
-            <th style="text-align:right">Precio</th>
-            <th style="text-align:right">Cambio</th>
-            <th style="text-align:right">Mkt Cap</th>
-            <th style="text-align:right">P/E</th>
-            <th style="text-align:right">Div Yield</th>
+            ${thSort("ticker","Ticker",false)}
+            ${thSort("name","Empresa",false)}
+            <th>Sector</th><th>Región</th>
+            ${thSort("price","Precio",true)}
+            ${thSort("change_pct","Cambio",true)}
+            ${thSort("market_cap","Mkt Cap",true)}
+            ${thSort("pe_ratio","P/E",true)}
+            ${thSort("dividend_yield","Div Yield",true)}
           </tr>
         </thead>
         <tbody>${rows}</tbody>
-      </table>
-    `;
+      </table>`;
 
     container.querySelectorAll("tr[data-ticker]").forEach(tr => {
       tr.addEventListener("click", () => openDetail(tr.dataset.ticker));
@@ -244,5 +319,6 @@ window.StocksTab = (function () {
   return {
     get loaded() { return loaded; },
     init,
+    _sortBy: sortBy,
   };
 })();
