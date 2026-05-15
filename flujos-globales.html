@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flujos Globales · TFG Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+:root{
+  --bg-0:#0d1117;--bg-1:#0d1117;--bg-2:rgba(255,255,255,.03);
+  --bg-3:rgba(255,255,255,.06);--line:rgba(255,255,255,.06);
+  --line-2:rgba(255,255,255,.12);--txt-0:#e6edf3;
+  --txt-1:rgba(255,255,255,.7);--txt-2:rgba(255,255,255,.35);
+  --txt-3:rgba(255,255,255,.25);--accent:#3fb950;
+  --blue:#58a6ff;--blue-glow:rgba(88,166,255,.08);
+  --radius-s:6px;--radius-m:10px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg-0);
+  color:var(--txt-0);font-size:14px;-webkit-font-smoothing:antialiased}
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+/* Sidebar */
+.sidebar{background:var(--bg-1);border-right:1px solid var(--line);
+  padding:28px 20px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  display:flex;flex-direction:column}
+.brand{font-family:'Fraunces',serif;font-size:26px;font-weight:700;
+  letter-spacing:-.02em;margin-bottom:4px;
+  background:linear-gradient(135deg,var(--accent),var(--blue));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.brand-sub{font-size:11px;color:var(--txt-2);text-transform:uppercase;
+  letter-spacing:.18em;margin-bottom:36px}
+.nav{display:flex;flex-direction:column;gap:4px;flex:1}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 14px;
+  border-radius:var(--radius-s);color:var(--txt-1);font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .15s ease;position:relative;text-decoration:none}
+.nav-item:hover{background:var(--bg-2);color:var(--txt-0)}
+.nav-item.active{background:var(--blue-glow);color:var(--blue)}
+.nav-item.active::before{content:'';position:absolute;left:-20px;top:50%;
+  transform:translateY(-50%);width:3px;height:18px;background:var(--blue);
+  border-radius:0 2px 2px 0}
+.nav-item .ti{font-size:18px;flex-shrink:0;opacity:.75}
+.nav-section{font-size:10px;color:var(--txt-3);text-transform:uppercase;
+  letter-spacing:.16em;padding:22px 14px 8px}
+.status{padding:14px;background:var(--bg-2);border-radius:var(--radius-s);
+  font-size:11px;color:var(--txt-2);margin-top:24px}
+.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;
+  background:#f0883e;margin-right:6px;box-shadow:0 0 8px #f0883e;
+  animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Main */
+.main{padding:24px 28px;display:flex;flex-direction:column;gap:10px}
+.topbar{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.tab-title{font-family:'Fraunces',serif;font-size:28px;font-weight:500;letter-spacing:-.02em}
+.tab-sub{color:var(--txt-2);font-size:12px;margin-top:2px}
+.mock-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;
+  border-radius:20px;background:rgba(240,136,62,.1);border:1px solid rgba(240,136,62,.22);
+  color:#f0883e;font-size:11px;font-weight:500}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;align-items:center;overflow-x:auto;
+  padding-bottom:4px;flex-shrink:0;
+  scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.filter-label{font-size:10px;color:var(--txt-3);white-space:nowrap;flex-shrink:0}
+.filter-sel{background:rgba(255,255,255,.04);border:1px solid var(--line-2);
+  color:var(--txt-1);font-size:11.5px;font-family:'DM Sans',sans-serif;
+  padding:4px 8px;border-radius:var(--radius-s);cursor:pointer;outline:none;flex-shrink:0}
+.filter-sel:focus{border-color:var(--blue)}
+.filter-sep{width:1px;height:18px;background:var(--line-2);flex-shrink:0}
+
+/* Flows layout */
+.flows-layout{display:grid;grid-template-columns:1fr 278px;gap:12px;
+  height:510px;flex-shrink:0}
+
+/* Map wrap */
+.map-wrap{position:relative;height:100%}
+.map-container{background:#080c12;border:1px solid var(--line);
+  border-radius:var(--radius-m);overflow:hidden;height:100%;width:100%}
+.map-container svg{display:block}
+.map-loading{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;background:#080c12;
+  z-index:20;border-radius:var(--radius-m)}
+.spinner{width:28px;height:28px;border:2px solid rgba(255,255,255,.07);
+  border-top-color:#f0883e;border-radius:50%;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.map-loading-text{font-size:12px;color:var(--txt-2)}
+
+/* Layer panel */
+.layer-panel{position:absolute;top:10px;left:10px;z-index:10;
+  background:rgba(8,13,20,.9);backdrop-filter:blur(12px);
+  border:1px solid rgba(255,255,255,.09);border-radius:var(--radius-m);
+  padding:10px 12px;width:152px;
+  max-height:calc(100% - 20px);overflow-y:auto}
+.layer-panel::-webkit-scrollbar{width:3px}
+.layer-panel::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:2px}
+.lp-section{margin-bottom:9px}
+.lp-section:last-child{margin-bottom:0}
+.lp-title{font-size:9px;color:var(--txt-3);text-transform:uppercase;
+  letter-spacing:.14em;margin-bottom:4px}
+.lp-row{display:flex;align-items:center;gap:6px;padding:2.5px 0;cursor:pointer;
+  user-select:none}
+.lp-row:hover .lp-name{color:var(--txt-1)}
+.lp-check{width:11px;height:11px;border-radius:2px;border:1px solid rgba(255,255,255,.18);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:8px;line-height:1;font-weight:700}
+.lp-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.lp-name{font-size:10.5px;color:var(--txt-2);transition:color .12s;line-height:1.2}
+
+/* Right panel */
+.right-panel{background:var(--bg-1);border:1px solid var(--line);
+  border-radius:var(--radius-m);display:flex;flex-direction:column;overflow:hidden}
+.rp-tabs{display:flex;border-bottom:1px solid var(--line)}
+.rp-tab{flex:1;padding:9px 4px;text-align:center;font-size:10.5px;color:var(--txt-2);
+  cursor:pointer;transition:color .12s;border-bottom:2px solid transparent;
+  margin-bottom:-1px;white-space:nowrap}
+.rp-tab:hover{color:var(--txt-1)}
+.rp-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.rp-body{flex:1;overflow-y:auto;padding:8px 10px}
+.rp-body::-webkit-scrollbar{width:3px}
+.rp-body::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:2px}
+.rp-item{display:flex;align-items:center;gap:7px;padding:5px 3px;
+  border-radius:6px;cursor:default;transition:background .12s;margin-bottom:1px}
+.rp-item.hoverable{cursor:pointer}
+.rp-item.hoverable:hover,.rp-item.hl{background:rgba(255,255,255,.03)}
+.rp-icon{width:20px;height:20px;border-radius:4px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0}
+.rp-info{flex:1;min-width:0}
+.rp-name{font-size:11px;color:var(--txt-0);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.rp-sub{font-size:9.5px;color:var(--txt-3);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-badge{font-family:'DM Mono',monospace;font-size:9.5px;padding:2px 5px;
+  border-radius:3px;flex-shrink:0;white-space:nowrap}
+.rp-head{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;
+  letter-spacing:.12em;margin:6px 0 4px;padding-top:2px}
+.rp-sep{height:1px;background:var(--line);margin:5px 0}
+
+/* Legend */
+.legend-bar{flex-shrink:0;padding:9px 14px;background:var(--bg-1);
+  border:1px solid var(--line);border-radius:var(--radius-s);display:flex;
+  align-items:center;gap:16px;flex-wrap:wrap;row-gap:6px}
+.lg-group{display:flex;align-items:center;gap:7px}
+.lg-title{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;
+  letter-spacing:.1em;flex-shrink:0}
+.lg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--txt-2)}
+.lg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.lg-line{width:16px;height:2px;border-radius:1px;flex-shrink:0}
+.lg-dash{width:16px;height:0;flex-shrink:0;border-top:2px dashed currentColor;opacity:.7}
+.lg-sep{width:1px;height:18px;background:var(--line-2)}
+
+/* Tooltip */
+.map-tooltip{position:fixed;background:#111820;border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;padding:10px 13px;pointer-events:none;z-index:1000;
+  max-width:240px;min-width:160px;box-shadow:0 8px 28px rgba(0,0,0,.55);display:none}
+.tt-title{font-size:12.5px;font-weight:600;color:var(--txt-0);margin-bottom:4px}
+.tt-badge{display:inline-block;padding:1px 7px;border-radius:3px;
+  font-size:10px;font-weight:600;margin-bottom:5px}
+.tt-row{display:flex;justify-content:space-between;gap:12px;
+  font-size:11px;margin-top:2px}
+.tt-key{color:var(--txt-2)}
+.tt-val{color:var(--txt-0);font-family:'DM Mono',monospace;font-size:10.5px;text-align:right}
+</style>
+</head>
+<body>
+<div class="app">
+
+<aside class="sidebar">
+  <div class="brand">TFG.terminal</div>
+  <div class="brand-sub">Ignacio Rodríguez · UFV</div>
+  <nav class="nav">
+    <a href="index.html" class="nav-item"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+    <a href="index.html" class="nav-item"><i class="ti ti-currency-bitcoin"></i>Cripto</a>
+    <a href="index.html" class="nav-item"><i class="ti ti-trending-up"></i>Acciones</a>
+    <a href="index.html" class="nav-item"><i class="ti ti-package"></i>Materias primas</a>
+    <div class="nav-section">Inteligencia</div>
+    <a href="index.html" class="nav-item"><i class="ti ti-brain"></i>Modelo TFG</a>
+    <a href="noticias.html" class="nav-item"><i class="ti ti-newspaper"></i>Noticias</a>
+    <a href="index.html" class="nav-item"><i class="ti ti-calendar-event"></i>Calendario</a>
+    <a href="index.html" class="nav-item"><i class="ti ti-world"></i>Macro</a>
+    <a href="mapa-global.html" class="nav-item"><i class="ti ti-map-2"></i>Mapa Global</a>
+    <a href="flujos-globales.html" class="nav-item active"><i class="ti ti-route"></i>Flujos Globales</a>
+  </nav>
+  <div class="status"><span class="status-dot"></span>Datos simulados · stub AIS/ADS-B</div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="tab-title">Flujos Globales</div>
+      <div class="tab-sub">Tráfico marítimo y aéreo · rutas de energía y mercancías</div>
+    </div>
+    <div class="mock-badge">
+      <i class="ti ti-database" style="font-size:13px"></i>
+      Datos de demostración — integración AIS/ADS-B en desarrollo
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <span class="filter-label">Tipo</span>
+    <select class="filter-sel" id="f-tipo" onchange="applyFilters()">
+      <option value="all">Todos</option>
+      <option value="maritime">Marítimo</option>
+      <option value="air">Aéreo</option>
+    </select>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Flujo</span>
+    <select class="filter-sel" id="f-flujo" onchange="applyFilters()">
+      <option value="all">Todos</option>
+      <option value="energy">Energía</option>
+      <option value="goods">Mercancías</option>
+      <option value="military">Militar</option>
+    </select>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Estado</span>
+    <select class="filter-sel" id="f-status" onchange="applyFilters()">
+      <option value="all">Todos</option>
+      <option value="transit">En tránsito</option>
+      <option value="patrol">Patrullando</option>
+    </select>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Período</span>
+    <select class="filter-sel" id="f-time">
+      <option value="rt">Tiempo real (stub)</option>
+      <option value="24h">Últimas 24 h</option>
+      <option value="7d">Última semana</option>
+    </select>
+  </div>
+
+  <div class="flows-layout">
+    <div class="map-wrap">
+      <div class="map-container" id="map-container">
+        <div class="map-loading" id="map-loading">
+          <div class="spinner"></div>
+          <div class="map-loading-text">Cargando mapa…</div>
+        </div>
+      </div>
+      <div class="layer-panel" id="layer-panel"></div>
+    </div>
+
+    <div class="right-panel">
+      <div class="rp-tabs" id="rp-tabs">
+        <div class="rp-tab active" data-tab="assets">Activos</div>
+        <div class="rp-tab" data-tab="nodes">Nodos</div>
+        <div class="rp-tab" data-tab="routes">Rutas</div>
+        <div class="rp-tab" data-tab="zones">Zonas</div>
+      </div>
+      <div class="rp-body" id="rp-body"></div>
+    </div>
+  </div>
+
+  <div class="legend-bar" id="legend-bar"></div>
+</main>
+</div>
+
+<div class="map-tooltip" id="map-tooltip">
+  <div id="tt-content"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// MOCK DATA  — replace with live AIS / ADS-B / Kpler calls
+// ═══════════════════════════════════════════════════════════
+const MOCK = {
+  ships:[
+    {id:'sh01',name:'Aframax Star',   type:'tanker',   flag:'GRC',lon:58.5,  lat:24.0,  hdg:272,cargo:'Crudo',          vol:'2.1M bbl',  from:'Ras Tanura', to:'Rotterdam',    status:'transit', flow:'energy'},
+    {id:'sh02',name:'Ever Global',    type:'container',flag:'TWN',lon:43.0,  lat:15.0,  hdg:335,cargo:'Contenedores',   vol:'18 200 TEU',from:'Shanghái',   to:'Rotterdam',    status:'transit', flow:'goods'},
+    {id:'sh03',name:'Pacific Frost',  type:'lng',      flag:'BHS',lon:65.0,  lat:21.0,  hdg:68, cargo:'GNL',            vol:'155 000 m³',from:'Ras Laffan', to:'Tokio',        status:'transit', flow:'energy'},
+    {id:'sh04',name:'Iron Ridge',     type:'bulk',     flag:'HKG',lon:-20.0, lat:-25.0, hdg:45, cargo:'Mineral hierro', vol:'175 000 t', from:'Vitória',    to:'Qingdao',      status:'transit', flow:'goods'},
+    {id:'sh05',name:'MSC Valencia',   type:'container',flag:'PAN',lon:15.0,  lat:36.0,  hdg:285,cargo:'Mercancías',     vol:'14 500 TEU',from:'Shanghái',   to:'Nueva York',   status:'transit', flow:'goods'},
+    {id:'sh06',name:'Gulf Stream',    type:'tanker',   flag:'MLT',lon:33.5,  lat:30.0,  hdg:320,cargo:'Fuel oil',       vol:'1.4M bbl',  from:'Houston',    to:'Rotterdam',    status:'transit', flow:'energy'},
+    {id:'sh07',name:'Arctic Wind',    type:'lng',      flag:'NOR',lon:3.0,   lat:57.0,  hdg:195,cargo:'GNL',            vol:'138 000 m³',from:'Hammerfest', to:'Reino Unido',  status:'transit', flow:'energy'},
+    {id:'sh08',name:'HMS Defender',   type:'military', flag:'GBR',lon:25.0,  lat:36.0,  hdg:90, cargo:'Patrulla',       vol:'—',         from:'Portsmouth', to:'Mediterráneo', status:'patrol',  flow:'military'},
+    {id:'sh09',name:'Capesize Atlas', type:'bulk',     flag:'GRC',lon:115.0, lat:-32.0, hdg:30, cargo:'Carbón',         vol:'180 000 t', from:'Fremantle',  to:'Seúl',         status:'transit', flow:'goods'},
+    {id:'sh10',name:'COSCO Asia',     type:'container',flag:'CHN',lon:-160.0,lat:30.0,  hdg:75, cargo:'Electrónica',    vol:'12 000 TEU',from:'Hong Kong',  to:'Long Beach',   status:'transit', flow:'goods'},
+    {id:'sh11',name:'Arabian Fortune',type:'tanker',   flag:'SAU',lon:67.0,  lat:19.0,  hdg:65, cargo:'Crudo Arab L.',  vol:'2.8M bbl',  from:'Juaymah',    to:'Mumbái',       status:'transit', flow:'energy'},
+    {id:'sh12',name:'CMA Hermes',     type:'container',flag:'FRA',lon:105.0, lat:3.0,   hdg:305,cargo:'Mercancías',     vol:'15 000 TEU',from:'Singapur',   to:'Le Havre',     status:'transit', flow:'goods'},
+    {id:'sh13',name:'Baltic Trader',  type:'bulk',     flag:'LVA',lon:33.0,  lat:43.5,  hdg:220,cargo:'Trigo',          vol:'55 000 t',  from:'Odesa',      to:'Estambul',     status:'transit', flow:'goods'},
+    {id:'sh14',name:'Methane Lydon',  type:'lng',      flag:'USA',lon:-30.0, lat:48.0,  hdg:80, cargo:'GNL',            vol:'148 000 m³',from:'Sabine Pass','to':'Rotterdam',  status:'transit', flow:'energy'},
+    {id:'sh15',name:'Maersk Elba',    type:'container',flag:'DNK',lon:2.0,   lat:53.5,  hdg:125,cargo:'Carga general',  vol:'9 000 TEU', from:'Rotterdam',  to:'Boston',       status:'transit', flow:'goods'},
+  ],
+  aircraft:[
+    {id:'ac01',name:'Cargolux CL456',type:'cargo',     flag:'LUX',lon:40.0,  lat:46.0,  hdg:80, cargo:'Electrónica',  vol:'120 t',   from:'Luxemburgo',to:'Hong Kong',    status:'transit',flow:'goods'},
+    {id:'ac02',name:'FedEx 789',     type:'cargo',     flag:'USA',lon:-20.0, lat:50.0,  hdg:70, cargo:'Paquetería',   vol:'95 t',    from:'Memphis',   to:'Frankfurt',    status:'transit',flow:'goods'},
+    {id:'ac03',name:'QR007',         type:'commercial',flag:'QAT',lon:55.0,  lat:30.0,  hdg:305,cargo:'Pasajeros',    vol:'283 pax', from:'Doha',      to:'JFK',          status:'transit',flow:'goods'},
+    {id:'ac04',name:'EK234',         type:'commercial',flag:'ARE',lon:18.0,  lat:44.0,  hdg:315,cargo:'Pasajeros',    vol:'354 pax', from:'Dubái',     to:'Londres',      status:'transit',flow:'goods'},
+    {id:'ac05',name:'SQ317',         type:'commercial',flag:'SGP',lon:-140.0,lat:50.0,  hdg:60, cargo:'Pasajeros',    vol:'471 pax', from:'Singapur',  to:'San Francisco',status:'transit',flow:'goods'},
+    {id:'ac06',name:'USAF C-17',     type:'military',  flag:'USA',lon:8.5,   lat:50.5,  hdg:145,cargo:'Logística',    vol:'—',        from:'Ramstein',  to:'Clasificado',  status:'transit',flow:'military'},
+    {id:'ac07',name:'UPS 872',       type:'cargo',     flag:'USA',lon:20.0,  lat:52.0,  hdg:260,cargo:'Paquetería',   vol:'108 t',   from:'Colonia',   to:'Louisville',   status:'transit',flow:'goods'},
+    {id:'ac08',name:'TK008F',        type:'cargo',     flag:'TUR',lon:35.0,  lat:45.0,  hdg:295,cargo:'Electrónica',  vol:'72 t',    from:'Estambul',  to:'Chicago',      status:'transit',flow:'goods'},
+    {id:'ac09',name:'CX853',         type:'commercial',flag:'HKG',lon:80.0,  lat:40.0,  hdg:295,cargo:'Pasajeros',    vol:'236 pax', from:'Hong Kong', to:'Frankfurt',    status:'transit',flow:'goods'},
+    {id:'ac10',name:'LA741',         type:'commercial',flag:'CHL',lon:-30.0, lat:35.0,  hdg:50, cargo:'Pasajeros',    vol:'214 pax', from:'Bogotá',    to:'Madrid',       status:'transit',flow:'goods'},
+    {id:'ac11',name:'FR4421',        type:'commercial',flag:'IRL',lon:-5.0,  lat:50.0,  hdg:160,cargo:'Pasajeros',    vol:'189 pax', from:'Dublín',    to:'Barcelona',    status:'transit',flow:'goods'},
+    {id:'ac12',name:'AF077',         type:'commercial',flag:'FRA',lon:-50.0, lat:52.0,  hdg:80, cargo:'Pasajeros',    vol:'298 pax', from:'París',     to:'Montreal',     status:'transit',flow:'goods'},
+  ],
+  ports:[
+    {id:'po01',name:'Shanghái',     lon:121.5, lat:31.2,  vol:776,  unit:'M ton', country:'China'},
+    {id:'po02',name:'Rotterdam',    lon:4.5,   lat:51.9,  vol:469,  unit:'M ton', country:'Países Bajos'},
+    {id:'po03',name:'Singapur',     lon:103.8, lat:1.35,  vol:374,  unit:'M ton', country:'Singapur'},
+    {id:'po04',name:'Houston',      lon:-95.4, lat:29.8,  vol:234,  unit:'M ton', country:'EE. UU.'},
+    {id:'po05',name:'Jebel Ali',    lon:55.03, lat:25.01, vol:202,  unit:'M ton', country:'Emiratos Árabes'},
+    {id:'po06',name:'Busan',        lon:129.06,lat:35.1,  vol:181,  unit:'M ton', country:'Corea del Sur'},
+    {id:'po07',name:'Los Ángeles',  lon:-118.2,lat:33.7,  vol:175,  unit:'M ton', country:'EE. UU.'},
+    {id:'po08',name:'Hamburgo',     lon:9.99,  lat:53.55, vol:131,  unit:'M ton', country:'Alemania'},
+    {id:'po09',name:'Ras Tanura',   lon:50.16, lat:26.64, vol:195,  unit:'M ton', country:'Arabia Saudí',note:'Terminal petrolífera'},
+    {id:'po10',name:'Port Klang',   lon:101.4, lat:3.0,   vol:138,  unit:'M ton', country:'Malasia'},
+  ],
+  airports:[
+    {id:'ap01',name:'DXB · Dubái',     lon:55.37, lat:25.25,vol:79,  unit:'M pax',country:'Emiratos Árabes'},
+    {id:'ap02',name:'ATL · Atlanta',   lon:-84.42,lat:33.64,vol:104, unit:'M pax',country:'EE. UU.'},
+    {id:'ap03',name:'LHR · Londres',   lon:-0.46, lat:51.48,vol:79,  unit:'M pax',country:'Reino Unido'},
+    {id:'ap04',name:'PVG · Shanghái',  lon:121.8, lat:31.15,vol:76,  unit:'M pax',country:'China'},
+    {id:'ap05',name:'MEM · Memphis',   lon:-89.98,lat:35.04,vol:4.5, unit:'M ton',country:'EE. UU.',note:'Hub de carga nº1'},
+    {id:'ap06',name:'HKG · Hong Kong', lon:113.92,lat:22.31,vol:4.5, unit:'M ton',country:'China',note:'Hub de carga Asia'},
+  ],
+  routes:[
+    {id:'rt01',name:'Asia–Europa (Suez)',     type:'maritime',cargo:'Contenedores / crudo',
+     pts:[[121.5,31.2],[110,18],[103.8,1.3],[87,8],[72,13],[58,22],[50,14],[44,12],[40,17],[36,22],[32.5,30],[27,33],[15,36],[-5,36],[-3,44],[4.5,51.9]]},
+    {id:'rt02',name:'Transpacífico Norte',    type:'maritime',cargo:'Contenedores / electrónica',
+     pts:[[121.5,31.2],[138,36],[155,44],[170,47],[-178,50],[-155,50],[-135,42],[-118,33.7]]},
+    {id:'rt03',name:'Golfo Pérsico–Europa',   type:'maritime',cargo:'Crudo OPEP',
+     pts:[[50.2,26.7],[57,25],[65,20],[72,13],[50,14],[44,12],[40,17],[36,22],[32.5,30],[20,35],[-5,36],[4.5,51.9]]},
+    {id:'rt04',name:'GNL Qatar–Japón',        type:'maritime',cargo:'GNL',
+     pts:[[51.5,25.3],[57,25],[68,20],[80,12],[95,6],[103,1],[110,10],[120,20],[135,33],[137.5,34.5]]},
+    {id:'rt05',name:'Transatlántico Norte',   type:'maritime',cargo:'Contenedores',
+     pts:[[4.5,51.9],[-5,51],[-20,50],[-40,48],[-60,44],[-74,40.7]]},
+    {id:'rt06',name:'Europa–Asia (aéreo)',    type:'air',    cargo:'Carga / pasajeros',
+     pts:[[8.5,50],[35,40],[55,25],[80,20],[103,1]]},
+    {id:'rt07',name:'Transpacífico (carga)', type:'air',    cargo:'Paquetería express',
+     pts:[[-90,35],[-150,61],[-160,55],[140,35],[113,22]]},
+    {id:'rt08',name:'Transatlántico (aéreo)',type:'air',    cargo:'Pasajeros',
+     pts:[[-74,40.7],[-50,52],[-20,53],[-0.5,51.5],[8.5,50]]},
+    {id:'rt09',name:'Pacífico Sur (carga)',  type:'air',    cargo:'Carga general',
+     pts:[[-118,33.7],[-150,55],[140,35.7],[103,1.3]]},
+  ],
+  zones:[
+    {id:'gz01',name:'Estrecho de Ormuz',    risk:4,desc:'Tensión Irán–EE. UU.; ataques a tankers',
+     coords:[[55.5,25.5],[57.5,25.5],[58.5,24.5],[57.5,23.5],[55.5,23.5],[54.5,24.5]]},
+    {id:'gz02',name:'Mar del Sur de China', risk:3,desc:'Disputas territoriales China–Filipinas–Vietnam',
+     coords:[[105,5],[122,5],[122,22],[114,22],[110,15],[106,10]]},
+    {id:'gz03',name:'Bab-el-Mandeb',        risk:5,desc:'Ataques Houthi a buques comerciales (2023–)',
+     coords:[[38,8],[50,8],[50,16],[44,20],[40,16],[36,14],[35,10]]},
+    {id:'gz04',name:'Mar Negro / Ucrania',  risk:4,desc:'Conflicto Rusia–Ucrania; rutas bloqueadas',
+     coords:[[28.5,44],[39,44],[39,47.5],[33,47.5],[28.5,46]]},
+    {id:'gz05',name:'Estrecho de Taiwán',   risk:3,desc:'Provocaciones militares China–Taiwán',
+     coords:[[118.5,21],[124,21],[124,27],[118.5,27]]},
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════
+// COLORS & LAYER CONFIG
+// ═══════════════════════════════════════════════════════════
+const C = {
+  tanker:'#f0883e', container:'#58a6ff', bulk:'#e3b341',
+  lng:'#3fb950',    military:'rgba(248,81,73,0.6)',
+  cargo:'#f0883e',  commercial:'#d2a8ff',military_air:'rgba(248,81,73,0.4)',
+  port:'#3fb950',   airport:'#58a6ff',
+  sea_route:'rgba(88,166,255,.38)', air_route:'rgba(210,168,255,.3)',
+};
+const CLABEL = {
+  tanker:'Tanker',container:'Contenedor',bulk:'Granelero',lng:'GNL',
+  military:'Militar naval',cargo:'Carga aérea',commercial:'Comercial',
+  military_air:'Militar aéreo',port:'Puerto',airport:'Aeropuerto',
+};
+const RISKC  = {1:'#a16207',2:'#9a3412',3:'#c2410c',4:'#b91c1c',5:'#f85149'};
+const RISKF  = {
+  1:'rgba(161,98,7,0.07)',  2:'rgba(154,52,18,0.09)',
+  3:'rgba(194,65,12,0.11)', 4:'rgba(185,28,28,0.13)', 5:'rgba(239,68,68,0.16)',
+};
+const RISKL  = {1:'Riesgo bajo',2:'Moderado',3:'Alto',4:'Muy alto',5:'Crítico'};
+
+const LAYERS = {
+  tanker:true,container:true,bulk:true,lng:true,military:false,
+  cargo:true,commercial:true,military_air:false,
+  port:true,airport:true,sea_route:true,air_route:true,geozone:true,
+};
+const LAYER_DEFS = [
+  {title:'Marítimo',items:[
+    {k:'tanker',    l:'Tankers'},
+    {k:'container', l:'Contenedores'},
+    {k:'bulk',      l:'Graneleros'},
+    {k:'lng',       l:'GNL'},
+    {k:'military',  l:'Naval militar'},
+  ]},
+  {title:'Aéreo',items:[
+    {k:'cargo',       l:'Carga aérea'},
+    {k:'commercial',  l:'Comercial'},
+    {k:'military_air',l:'Militar aéreo'},
+  ]},
+  {title:'Infraestructura',items:[
+    {k:'port',    l:'Puertos'},
+    {k:'airport', l:'Aeropuertos'},
+  ]},
+  {title:'Flujos & Zonas',items:[
+    {k:'sea_route',l:'Rutas marítimas'},
+    {k:'air_route',l:'Rutas aéreas'},
+    {k:'geozone',  l:'Zonas de riesgo'},
+  ]},
+];
+
+// ═══════════════════════════════════════════════════════════
+// FILTER STATE
+// ═══════════════════════════════════════════════════════════
+let FILTER = {tipo:'all',flujo:'all',status:'all'};
+
+function applyFilters() {
+  FILTER.tipo   = document.getElementById('f-tipo').value;
+  FILTER.flujo  = document.getElementById('f-flujo').value;
+  FILTER.status = document.getElementById('f-status').value;
+  drawLayers();
+}
+
+function shipVisible(s) {
+  if(FILTER.tipo==='air') return false;
+  if(FILTER.flujo!=='all' && s.flow!==FILTER.flujo) return false;
+  if(FILTER.status!=='all' && s.status!==FILTER.status) return false;
+  const lk = s.type==='military'?'military':s.type;
+  return LAYERS[lk];
+}
+function airVisible(a) {
+  if(FILTER.tipo==='maritime') return false;
+  if(FILTER.flujo!=='all' && a.flow!==FILTER.flujo) return false;
+  if(FILTER.status!=='all' && a.status!==FILTER.status) return false;
+  const lk = a.type==='military'?'military_air':a.type;
+  return LAYERS[lk];
+}
+
+// ═══════════════════════════════════════════════════════════
+// D3 STATE
+// ═══════════════════════════════════════════════════════════
+let svgEl, gEl, proj, pathFn, zoomBx;
+let rpTab = 'assets';
+
+// ═══════════════════════════════════════════════════════════
+// MAP INIT
+// ═══════════════════════════════════════════════════════════
+async function initMap() {
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const wrap = document.getElementById('map-container');
+  const {width,height} = wrap.getBoundingClientRect();
+
+  proj = d3.geoNaturalEarth1()
+    .scale((width/6.28)*0.88).translate([width/2,height/2]);
+  pathFn = d3.geoPath().projection(proj);
+
+  svgEl = d3.select('#map-container').append('svg')
+    .attr('width',width).attr('height',height).style('display','block');
+
+  zoomBx = d3.zoom().scaleExtent([0.8,12])
+    .on('zoom', e => gEl.attr('transform',e.transform));
+  svgEl.call(zoomBx);
+  svgEl.on('dblclick.zoom',null);
+  svgEl.on('dblclick', () => svgEl.transition().duration(400).call(zoomBx.transform,d3.zoomIdentity));
+
+  gEl = svgEl.append('g');
+
+  if(!window.worldTopo) {
+    window.worldTopo = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+  }
+  const ctry = topojson.feature(window.worldTopo,window.worldTopo.objects.countries);
+  gEl.append('g').attr('class','g-ctry')
+    .selectAll('path').data(ctry.features).enter()
+    .append('path').attr('d',pathFn)
+    .attr('fill','#1a2030').attr('stroke','rgba(255,255,255,.07)').attr('stroke-width',.4);
+
+  // Layer groups — order = z-order
+  ['g-zones','g-sea','g-air','g-ports','g-airports','g-ships','g-aircraft'].forEach(cls=>{
+    gEl.append('g').attr('class',cls);
+  });
+
+  // Reset zoom button
+  const btn = document.createElement('button');
+  btn.title='Restablecer zoom (doble clic)';
+  btn.innerHTML='<i class="ti ti-zoom-reset" style="font-size:14px"></i>';
+  btn.style.cssText='position:absolute;bottom:10px;right:10px;z-index:5;background:rgba(8,13,20,.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.55);border-radius:6px;padding:5px 7px;cursor:pointer;line-height:1;transition:all .15s';
+  btn.onmouseenter=()=>{btn.style.color='#fff';btn.style.borderColor='rgba(255,255,255,.25)'};
+  btn.onmouseleave=()=>{btn.style.color='rgba(255,255,255,.55)';btn.style.borderColor='rgba(255,255,255,.1)'};
+  btn.onclick=()=>svgEl.transition().duration(400).call(zoomBx.transform,d3.zoomIdentity);
+  wrap.appendChild(btn);
+
+  const deb=(fn,ms)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),ms)}};
+  window.addEventListener('resize',deb(()=>{
+    const r=wrap.getBoundingClientRect();
+    svgEl.attr('width',r.width).attr('height',r.height);
+    proj.scale((r.width/6.28)*0.88).translate([r.width/2,r.height/2]);
+    pathFn=d3.geoPath().projection(proj);
+    gEl.select('.g-ctry').selectAll('path').attr('d',pathFn);
+    drawLayers();
+  },200));
+}
+
+// ═══════════════════════════════════════════════════════════
+// DRAW LAYERS
+// ═══════════════════════════════════════════════════════════
+function pt(lon,lat){try{return proj([lon,lat])||[null,null]}catch(e){return[null,null]}}
+
+function drawLayers() {
+  drawZones();
+  drawRoutes();
+  drawPorts();
+  drawAirports();
+  drawShips();
+  drawAircraft();
+}
+
+function drawZones() {
+  const g = gEl.select('.g-zones'); g.selectAll('*').remove();
+  if(!LAYERS.geozone || FILTER.tipo==='air') return;
+  MOCK.zones.forEach(z=>{
+    // Convert each vertex to screen coordinates (avoids GeoJSON winding-order issues
+    // that cause D3 to fill the complement of the polygon instead of the polygon itself)
+    const screenPts = z.coords.map(([lon,lat]) => {
+      try { const p = proj([lon,lat]); return (p && isFinite(p[0]) && isFinite(p[1])) ? p : null; }
+      catch(e) { return null; }
+    }).filter(Boolean);
+    if(screenPts.length < 3) return;
+    const d = 'M' + screenPts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join('L') + 'Z';
+    g.append('path').attr('d', d)
+      .attr('fill', RISKF[z.risk]).attr('stroke', RISKC[z.risk])
+      .attr('stroke-width', 1.4).attr('stroke-dasharray','5 3')
+      .style('cursor','pointer')
+      .on('mouseover',function(e){showZoneTT(e,z);d3.select(this).attr('stroke-width',2.2)})
+      .on('mousemove',moveTT)
+      .on('mouseout',function(){hideTT();d3.select(this).attr('stroke-width',1.4)});
+  });
+}
+
+function drawRoutes() {
+  // Maritime
+  const gS = gEl.select('.g-sea'); gS.selectAll('*').remove();
+  const seaOn = LAYERS.sea_route && FILTER.tipo!=='air';
+  if(seaOn) {
+    MOCK.routes.filter(r=>r.type==='maritime').forEach(r=>{
+      const geo={type:'Feature',geometry:{type:'LineString',coordinates:r.pts}};
+      gS.append('path').datum(geo).attr('d',pathFn)
+        .attr('fill','none').attr('stroke',C.sea_route)
+        .attr('stroke-width',2.2).attr('stroke-dasharray','8 4')
+        .style('cursor','pointer')
+        .on('mouseover',e=>showRouteTT(e,r)).on('mousemove',moveTT).on('mouseout',hideTT);
+    });
+  }
+  // Air
+  const gA = gEl.select('.g-air'); gA.selectAll('*').remove();
+  const airOn = LAYERS.air_route && FILTER.tipo!=='maritime';
+  if(airOn) {
+    MOCK.routes.filter(r=>r.type==='air').forEach(r=>{
+      const geo={type:'Feature',geometry:{type:'LineString',coordinates:r.pts}};
+      gA.append('path').datum(geo).attr('d',pathFn)
+        .attr('fill','none').attr('stroke',C.air_route)
+        .attr('stroke-width',1.5).attr('stroke-dasharray','4 5')
+        .style('cursor','pointer')
+        .on('mouseover',e=>showRouteTT(e,r)).on('mousemove',moveTT).on('mouseout',hideTT);
+    });
+  }
+}
+
+function drawPorts() {
+  const g = gEl.select('.g-ports'); g.selectAll('*').remove();
+  if(!LAYERS.port || FILTER.tipo==='air') return;
+  MOCK.ports.forEach(p=>{
+    const [x,y]=pt(p.lon,p.lat); if(x===null) return;
+    const r = Math.sqrt(p.vol)*0.38+4;
+    const grp=g.append('g').attr('transform',`translate(${x},${y})`).style('cursor','pointer')
+      .on('mouseover',e=>showNodeTT(e,p,'port')).on('mousemove',moveTT).on('mouseout',hideTT);
+    grp.append('circle').attr('r',r+4).attr('fill','rgba(63,185,80,.06)');
+    grp.append('circle').attr('r',r).attr('fill','rgba(63,185,80,.18)')
+      .attr('stroke','#3fb950').attr('stroke-width',1.3);
+    grp.append('circle').attr('r',2.5).attr('fill','#3fb950');
+  });
+}
+
+function drawAirports() {
+  const g = gEl.select('.g-airports'); g.selectAll('*').remove();
+  if(!LAYERS.airport || FILTER.tipo==='maritime') return;
+  MOCK.airports.forEach(a=>{
+    const [x,y]=pt(a.lon,a.lat); if(x===null) return;
+    const r=Math.max(a.vol*0.28,4)+2;
+    const grp=g.append('g').attr('transform',`translate(${x},${y})`).style('cursor','pointer')
+      .on('mouseover',e=>showNodeTT(e,a,'airport')).on('mousemove',moveTT).on('mouseout',hideTT);
+    // Diamond shape
+    grp.append('path').attr('d',`M0,${-r} L${r*0.65},0 L0,${r} L${-r*0.65},0 Z`)
+      .attr('fill','rgba(88,166,255,.18)').attr('stroke','#58a6ff').attr('stroke-width',1.2);
+    grp.append('circle').attr('r',2).attr('fill','#58a6ff');
+  });
+}
+
+// Ship arrow pointing up (heading 0 = north); rotate(hdg)
+const SARROW = 'M0,-8 L4.5,6 L0,3 L-4.5,6 Z';
+// Plane pointing right (east = 90°); rotate(hdg-90)
+const PARROW = 'M0,-7 L4,5 L0,2.5 L-4,5 Z';
+
+function drawShips() {
+  const g = gEl.select('.g-ships'); g.selectAll('*').remove();
+  MOCK.ships.filter(shipVisible).forEach(s=>{
+    const [x,y]=pt(s.lon,s.lat); if(x===null) return;
+    const col=C[s.type]||'#888';
+    const grp=g.append('g').attr('id','sv-'+s.id).attr('transform',`translate(${x},${y})`)
+      .style('cursor','pointer')
+      .on('mouseover',e=>{showAssetTT(e,s,'ship');grp.select('path.marker').attr('stroke','#fff').attr('stroke-width',1.8)})
+      .on('mousemove',moveTT)
+      .on('mouseout',e=>{hideTT();grp.select('path.marker').attr('stroke','rgba(0,0,0,.45)').attr('stroke-width',1)});
+    // Glow halo
+    grp.append('circle').attr('r',9).attr('fill',col).attr('opacity',.08);
+    grp.append('path').attr('class','marker').attr('d',SARROW)
+      .attr('transform',`rotate(${s.hdg})`)
+      .attr('fill',col).attr('stroke','rgba(0,0,0,.45)').attr('stroke-width',1);
+  });
+}
+
+function drawAircraft() {
+  const g = gEl.select('.g-aircraft'); g.selectAll('*').remove();
+  MOCK.aircraft.filter(airVisible).forEach(a=>{
+    const [x,y]=pt(a.lon,a.lat); if(x===null) return;
+    const type = a.type==='military'?'military_air':a.type;
+    const col = C[type]||'#888';
+    const grp=g.append('g').attr('id','av-'+a.id).attr('transform',`translate(${x},${y})`)
+      .style('cursor','pointer')
+      .on('mouseover',e=>{showAssetTT(e,a,'air');grp.select('path.marker').attr('stroke','#fff').attr('stroke-width',1.8)})
+      .on('mousemove',moveTT)
+      .on('mouseout',e=>{hideTT();grp.select('path.marker').attr('stroke','rgba(0,0,0,.35)').attr('stroke-width',1)});
+    // Glow halo
+    grp.append('circle').attr('r',8).attr('fill',col).attr('opacity',.07);
+    grp.append('path').attr('class','marker').attr('d',PARROW)
+      .attr('transform',`rotate(${a.hdg-90})`)
+      .attr('fill',col).attr('stroke','rgba(0,0,0,.35)').attr('stroke-width',1);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOOLTIP
+// ═══════════════════════════════════════════════════════════
+const ttEl = document.getElementById('map-tooltip');
+function showTT(html){document.getElementById('tt-content').innerHTML=html;ttEl.style.display='block'}
+function hideTT(){ttEl.style.display='none'}
+function moveTT(e){
+  const W=248,H=130,x=e.clientX+14,y=e.clientY-28;
+  ttEl.style.left=(x+W>window.innerWidth?e.clientX-W-14:x)+'px';
+  ttEl.style.top= (y+H>window.innerHeight?e.clientY-H-10:y)+'px';
+}
+function badge(lbl,col){return`<span class="tt-badge" style="background:${col}22;color:${col};border:1px solid ${col}44">${lbl}</span>`}
+function row(k,v){return`<div class="tt-row"><span class="tt-key">${k}</span><span class="tt-val">${v}</span></div>`}
+
+function showAssetTT(e,a,kind){
+  const type=kind==='air'&&a.type==='military'?'military_air':a.type;
+  const col=C[type]||'#888';
+  showTT(`<div class="tt-title">${a.name} <small style="color:var(--txt-3)">${a.flag}</small></div>
+    ${badge(CLABEL[type]||type,col)}
+    ${row('Ruta',`${a.from} → ${a.to}`)}
+    ${row('Carga',a.cargo)}
+    ${row('Volumen',a.vol)}
+    ${row('Estado',a.status==='transit'?'En tránsito':'Patrullando')}
+  `);
+  moveTT(e);
+}
+function showNodeTT(e,n,kind){
+  const col=kind==='port'?'#3fb950':'#58a6ff';
+  const lbl=kind==='port'?'Puerto':'Aeropuerto';
+  showTT(`<div class="tt-title">${n.name}</div>
+    ${badge(lbl,col)}
+    ${row('País',n.country)}
+    ${row('Volumen',`${n.vol} ${n.unit}`)}
+    ${n.note?row('Especialidad',n.note):''}
+  `);
+  moveTT(e);
+}
+function showZoneTT(e,z){
+  const col=RISKC[z.risk];
+  showTT(`<div class="tt-title">${z.name}</div>
+    ${badge(RISKL[z.risk],col)}
+    <div style="font-size:10.5px;color:var(--txt-2);margin-top:5px;line-height:1.45">${z.desc}</div>
+  `);
+  moveTT(e);
+}
+function showRouteTT(e,r){
+  const col=r.type==='maritime'?'#58a6ff':'#d2a8ff';
+  const lbl=r.type==='maritime'?'Marítima':'Aérea';
+  showTT(`<div class="tt-title">${r.name}</div>
+    ${badge(lbl,col)}
+    ${row('Carga principal',r.cargo)}
+  `);
+  moveTT(e);
+}
+
+// ═══════════════════════════════════════════════════════════
+// LAYER PANEL
+// ═══════════════════════════════════════════════════════════
+function buildLayerPanel(){
+  const panel=document.getElementById('layer-panel');
+  panel.innerHTML='';
+  LAYER_DEFS.forEach(sec=>{
+    const s=document.createElement('div');
+    s.className='lp-section';
+    s.innerHTML=`<div class="lp-title">${sec.title}</div>`;
+    sec.items.forEach(item=>{
+      const on=LAYERS[item.k];
+      const col=C[item.k]||'#888';
+      const row=document.createElement('div');
+      row.className='lp-row';
+      row.onclick=()=>{LAYERS[item.k]=!LAYERS[item.k];buildLayerPanel();drawLayers()};
+      row.innerHTML=`
+        <div class="lp-check" style="${on?`background:${col}33;color:${col};border-color:${col}66`:''}">
+          ${on?'✓':''}
+        </div>
+        <div class="lp-dot" style="background:${col};opacity:${on?1:.25}"></div>
+        <span class="lp-name" style="opacity:${on?1:.4}">${item.l}</span>`;
+      s.appendChild(row);
+    });
+    panel.appendChild(s);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// RIGHT PANEL
+// ═══════════════════════════════════════════════════════════
+function renderRP(){
+  const body=document.getElementById('rp-body');
+  if(rpTab==='assets')  body.innerHTML=renderAssets();
+  else if(rpTab==='nodes')  body.innerHTML=renderNodes();
+  else if(rpTab==='routes') body.innerHTML=renderRoutes();
+  else body.innerHTML=renderZones();
+}
+
+function assetRow(a,kind){
+  const type=kind==='air'&&a.type==='military'?'military_air':a.type;
+  const col=C[type]||'#888';
+  const icon=kind==='ship'?'ti-ship':'ti-plane';
+  return`<div class="rp-item hoverable" id="rpi-${a.id}"
+    onmouseenter="hlAsset('${a.id}','${kind}',true)"
+    onmouseleave="hlAsset('${a.id}','${kind}',false)">
+    <div class="rp-icon" style="background:${col}1a;color:${col}">
+      <i class="ti ${icon}" style="font-size:11px"></i>
+    </div>
+    <div class="rp-info">
+      <div class="rp-name">${a.name}</div>
+      <div class="rp-sub">${a.from} → ${a.to}</div>
+    </div>
+    <span class="rp-badge" style="background:${col}1a;color:${col}">${CLABEL[type]||type}</span>
+  </div>`;
+}
+function renderAssets(){
+  const visShips=MOCK.ships.filter(shipVisible);
+  const visAir=MOCK.aircraft.filter(airVisible);
+  return`
+    <div class="rp-head">Buques activos (${visShips.length})</div>
+    ${visShips.map(s=>assetRow(s,'ship')).join('')}
+    <div class="rp-sep"></div>
+    <div class="rp-head">Aeronaves (${visAir.length})</div>
+    ${visAir.map(a=>assetRow(a,'air')).join('')}
+  `;
+}
+
+function renderNodes(){
+  const ports=[...MOCK.ports].sort((a,b)=>b.vol-a.vol);
+  const aps=[...MOCK.airports].sort((a,b)=>b.vol-a.vol);
+  return`
+    <div class="rp-head">Puertos — por volumen</div>
+    ${ports.map((p,i)=>`<div class="rp-item">
+      <div class="rp-icon" style="background:rgba(63,185,80,.1);color:#3fb950;font-size:10px;font-weight:700">${i+1}</div>
+      <div class="rp-info"><div class="rp-name">${p.name}</div><div class="rp-sub">${p.country}</div></div>
+      <span class="rp-badge" style="background:rgba(63,185,80,.1);color:#3fb950">${p.vol} ${p.unit}</span>
+    </div>`).join('')}
+    <div class="rp-sep"></div>
+    <div class="rp-head">Aeropuertos</div>
+    ${aps.map((a,i)=>`<div class="rp-item">
+      <div class="rp-icon" style="background:rgba(88,166,255,.1);color:#58a6ff;font-size:10px;font-weight:700">${i+1}</div>
+      <div class="rp-info"><div class="rp-name">${a.name}</div><div class="rp-sub">${a.country}</div></div>
+      <span class="rp-badge" style="background:rgba(88,166,255,.1);color:#58a6ff">${a.vol} ${a.unit}</span>
+    </div>`).join('')}
+  `;
+}
+
+function renderRoutes(){
+  const sea=MOCK.routes.filter(r=>r.type==='maritime');
+  const air=MOCK.routes.filter(r=>r.type==='air');
+  return`
+    <div class="rp-head">Rutas marítimas (${sea.length})</div>
+    ${sea.map(r=>`<div class="rp-item">
+      <div class="rp-icon" style="background:rgba(88,166,255,.1);color:#58a6ff">
+        <i class="ti ti-anchor" style="font-size:11px"></i>
+      </div>
+      <div class="rp-info"><div class="rp-name">${r.name}</div><div class="rp-sub">${r.cargo}</div></div>
+    </div>`).join('')}
+    <div class="rp-sep"></div>
+    <div class="rp-head">Rutas aéreas (${air.length})</div>
+    ${air.map(r=>`<div class="rp-item">
+      <div class="rp-icon" style="background:rgba(210,168,255,.1);color:#d2a8ff">
+        <i class="ti ti-plane" style="font-size:11px"></i>
+      </div>
+      <div class="rp-info"><div class="rp-name">${r.name}</div><div class="rp-sub">${r.cargo}</div></div>
+    </div>`).join('')}
+  `;
+}
+
+function renderZones(){
+  return`
+    <div class="rp-head">Zonas de riesgo activas</div>
+    ${[...MOCK.zones].sort((a,b)=>b.risk-a.risk).map(z=>{
+      const col=RISKC[z.risk];
+      return`<div class="rp-item">
+        <div class="rp-icon" style="background:${col}22;color:${col}">
+          <i class="ti ti-alert-triangle" style="font-size:11px"></i>
+        </div>
+        <div class="rp-info">
+          <div class="rp-name">${z.name}</div>
+          <div class="rp-sub">${z.desc}</div>
+        </div>
+        <span class="rp-badge" style="background:${col}22;color:${col}">${RISKL[z.risk]}</span>
+      </div>`;
+    }).join('')}
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// HIGHLIGHT
+// ═══════════════════════════════════════════════════════════
+function hlAsset(id,kind,on){
+  const prefix=kind==='ship'?'sv-':'av-';
+  const el=document.getElementById(prefix+id);
+  if(el) d3.select(el).select('path')
+    .attr('stroke',on?'#fff':'rgba(0,0,0,.4)')
+    .attr('stroke-width',on?1.8:.8);
+  const rpi=document.getElementById('rpi-'+id);
+  if(rpi) rpi.classList.toggle('hl',on);
+}
+
+// ═══════════════════════════════════════════════════════════
+// LEGEND
+// ═══════════════════════════════════════════════════════════
+function renderLegend(){
+  document.getElementById('legend-bar').innerHTML=`
+    <div class="lg-group">
+      <span class="lg-title">Buques</span>
+      <div class="lg-item"><div class="lg-dot" style="background:${C.tanker}"></div>Tanker</div>
+      <div class="lg-item"><div class="lg-dot" style="background:${C.container}"></div>Contenedor</div>
+      <div class="lg-item"><div class="lg-dot" style="background:${C.bulk}"></div>Granelero</div>
+      <div class="lg-item"><div class="lg-dot" style="background:${C.lng}"></div>GNL</div>
+    </div>
+    <div class="lg-sep"></div>
+    <div class="lg-group">
+      <span class="lg-title">Aéreo</span>
+      <div class="lg-item"><div class="lg-dot" style="background:${C.cargo}"></div>Carga</div>
+      <div class="lg-item"><div class="lg-dot" style="background:${C.commercial}"></div>Comercial</div>
+    </div>
+    <div class="lg-sep"></div>
+    <div class="lg-group">
+      <span class="lg-title">Rutas</span>
+      <div class="lg-item"><div class="lg-dash" style="color:rgba(88,166,255,.8)"></div>Marítima</div>
+      <div class="lg-item"><div class="lg-dash" style="color:rgba(210,168,255,.7)"></div>Aérea</div>
+    </div>
+    <div class="lg-sep"></div>
+    <div class="lg-group">
+      <span class="lg-title">Riesgo</span>
+      ${[3,4,5].map(r=>`<div class="lg-item"><div class="lg-dot" style="background:${RISKC[r]}"></div>${RISKL[r]}</div>`).join('')}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('rp-tabs').addEventListener('click',e=>{
+  const tab=e.target.closest('.rp-tab');
+  if(!tab) return;
+  document.querySelectorAll('.rp-tab').forEach(t=>t.classList.remove('active'));
+  tab.classList.add('active');
+  rpTab=tab.dataset.tab;
+  renderRP();
+});
+
+// ═══════════════════════════════════════════════════════════
+// API STUBS (production integration points)
+// ═══════════════════════════════════════════════════════════
+/*
+// Spire Maritime AIS streaming
+async function fetchAIS(apiKey) {
+  const r = await fetch('https://api.spire.com/v3/maritime/vessels', {
+    headers: { Authorization: `Bearer ${apiKey}` }
+  });
+  const d = await r.json();
+  return d.vessels.map(v => ({
+    id: v.mmsi, name: v.name,
+    type: mapVesselType(v.vessel_type), flag: v.flag,
+    lon: v.position.longitude, lat: v.position.latitude,
+    hdg: v.heading, status: v.navigational_status,
+  }));
+}
+
+// OpenSky Network ADS-B (free, 5s delay)
+async function fetchADSB(bbox) {  // bbox: {lamin,lamax,lomin,lomax}
+  const qs = bbox ? `?lamin=${bbox.lamin}&lamax=${bbox.lamax}&lomin=${bbox.lomin}&lomax=${bbox.lomax}` : '';
+  const r = await fetch(`https://opensky-network.org/api/states/all${qs}`);
+  const d = await r.json();
+  return (d.states||[]).map(s => ({
+    icao24: s[0], callsign: (s[1]||'').trim(),
+    lon: s[5], lat: s[6], hdg: s[10], on_ground: s[8],
+  }));
+}
+
+// Kpler tanker flow data
+async function fetchTankerFlows(apiKey, commodity='crude_oil', period='last_30d') {
+  const r = await fetch(
+    `https://api.kpler.com/v1/flows?commodity=${commodity}&period=${period}`,
+    { headers: { Authorization: `Token ${apiKey}` } }
+  );
+  return r.json(); // { flows: [{origin, destination, volume, unit}] }
+}
+
+// FlightAware AeroAPI cargo tracking
+async function fetchCargoFlights(apiKey) {
+  const r = await fetch('https://aeroapi.flightaware.com/aeroapi/flights/search', {
+    headers: { 'x-apikey': apiKey },
+    method: 'POST',
+    body: JSON.stringify({ query: '-type C' }) // cargo types
+  });
+  return r.json();
+}
+*/
+
+// ═══════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════
+(async function boot(){
+  buildLayerPanel();
+  renderLegend();
+  await initMap();
+  document.getElementById('map-loading').style.display='none';
+  drawLayers();
+  renderRP();
+}());
+</script>
+</body>
+</html>
