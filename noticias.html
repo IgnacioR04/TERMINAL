@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noticias · TFG Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<style>
+:root {
+  --bg-0:          #0d1117;
+  --bg-1:          #0d1117;
+  --bg-2:          rgba(255,255,255,0.03);
+  --bg-3:          rgba(255,255,255,0.06);
+  --line:          rgba(255,255,255,0.06);
+  --line-2:        rgba(255,255,255,0.12);
+  --txt-0:         #e6edf3;
+  --txt-1:         rgba(255,255,255,0.7);
+  --txt-2:         rgba(255,255,255,0.35);
+  --txt-3:         rgba(255,255,255,0.25);
+  --accent:        #3fb950;
+  --accent-dim:    rgba(63,185,80,0.12);
+  --red:           #f85149;
+  --red-dim:       rgba(248,81,73,0.12);
+  --amber:         #f0883e;
+  --blue:          #58a6ff;
+  --blue-dim:      rgba(88,166,255,0.12);
+  --blue-glow:     rgba(88,166,255,0.08);
+  --radius-s:      6px;
+  --radius-m:      10px;
+  --radius-l:      12px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-0);
+  color: var(--txt-0);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── Layout ── */
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
+  padding: 28px 20px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.brand {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--accent), var(--blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--txt-2);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin-bottom: 36px;
+}
+.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-s);
+  color: var(--txt-1);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--bg-2); color: var(--txt-0); }
+.nav-item.active {
+  background: var(--blue-glow);
+  color: var(--blue);
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background: var(--blue);
+  border-radius: 0 2px 2px 0;
+}
+.nav-item .ti { font-size: 18px; flex-shrink: 0; opacity: 0.75; }
+.nav-section {
+  font-size: 10px;
+  color: var(--txt-3);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 22px 14px 8px;
+}
+.status {
+  padding: 14px;
+  background: var(--bg-2);
+  border-radius: var(--radius-s);
+  font-size: 11px;
+  color: var(--txt-2);
+  margin-top: 24px;
+}
+.status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ── Main ── */
+.main {
+  padding: 28px 36px;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.tab-title {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.tab-sub { color: var(--txt-2); font-size: 13px; margin-top: 4px; }
+.topbar-right { display: flex; align-items: center; gap: 14px; }
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--txt-1);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.refresh-btn:hover { background: var(--bg-3); color: var(--txt-0); }
+.refresh-btn.spinning .ti { animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.next-refresh { font-size: 11px; color: var(--txt-3); font-family: 'DM Mono', monospace; }
+
+/* ── API Banner ── */
+.api-banner {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(240,136,62,0.08);
+  border: 1px solid rgba(240,136,62,0.25);
+  border-radius: var(--radius-m);
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--amber);
+}
+.api-banner.visible { display: flex; }
+.api-banner .ti { font-size: 18px; flex-shrink: 0; }
+.api-banner a { color: var(--amber); }
+
+/* ── Top 5 cards ── */
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--txt-3);
+  margin-bottom: 12px;
+}
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.news-card {
+  background: rgba(255,255,255,0.02);
+  border: 0.5px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.news-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.news-card:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+}
+.card-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  align-self: flex-start;
+  border: 1px solid;
+}
+.card-headline {
+  font-size: 12.5px;
+  color: var(--txt-0);
+  line-height: 1.45;
+  font-weight: 500;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-meta {
+  font-size: 10px;
+  color: var(--txt-3);
+  display: flex;
+  justify-content: space-between;
+}
+.card-thumb {
+  width: 100%;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+.card-thumb-placeholder {
+  width: 100%;
+  height: 64px;
+  background: var(--bg-3);
+  border-radius: 6px;
+}
+
+/* ── Filter tabs ── */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.filter-pill {
+  padding: 5px 14px;
+  border-radius: 16px;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.filter-pill:hover {
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.7);
+}
+.filter-pill.active {
+  background: var(--blue-dim);
+  color: var(--blue);
+  border-color: rgba(88,166,255,0.3);
+}
+.result-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--txt-3);
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── News table ── */
+.table-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+thead th {
+  padding: 10px 14px;
+  font-size: 10px;
+  color: var(--txt-3);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: left;
+  background: rgba(255,255,255,0.02);
+  border-bottom: 1px solid var(--line);
+  font-weight: 500;
+}
+tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.1s;
+}
+tbody tr:nth-child(even) { background: rgba(255,255,255,0.01); }
+tbody tr:hover { background: rgba(255,255,255,0.03); }
+tbody tr:last-child { border-bottom: none; }
+tbody td {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+.td-hora {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--txt-2);
+  white-space: nowrap;
+  width: 52px;
+}
+.td-cat  { width: 90px; }
+.td-src  { font-size: 11px; color: var(--txt-2); white-space: nowrap; width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.td-tit  { font-size: 13px; }
+.td-tit a {
+  color: var(--txt-1);
+  text-decoration: none;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.td-tit a:hover { color: var(--txt-0); text-decoration: underline; }
+.cat-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+/* ── Loading state ── */
+.table-loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--txt-2);
+}
+.spinner {
+  display: inline-block;
+  width: 24px; height: 24px;
+  border: 2px solid rgba(255,255,255,0.07);
+  border-top-color: #3fb950;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  margin-bottom: 10px;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="brand">TFG.terminal</div>
+    <div class="brand-sub">Ignacio Rodríguez · UFV</div>
+    <nav class="nav">
+      <a href="index.html" class="nav-item"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-currency-bitcoin"></i>Cripto</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-trending-up"></i>Acciones</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-package"></i>Materias primas</a>
+      <div class="nav-section">Inteligencia</div>
+      <a href="index.html" class="nav-item"><i class="ti ti-brain"></i>Modelo TFG</a>
+      <a href="noticias.html" class="nav-item active"><i class="ti ti-newspaper"></i>Noticias</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-calendar-event"></i>Calendario</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-world"></i>Macro</a>
+      <a href="mapa-global.html" class="nav-item"><i class="ti ti-map-2"></i>Mapa Global</a>
+    </nav>
+    <div class="status">
+      <span class="status-dot"></span>
+      <span id="status-text">Actualización automática</span>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div>
+        <div class="tab-title">Noticias</div>
+        <div class="tab-sub">Noticias financieras en tiempo real · Finnhub</div>
+      </div>
+      <div class="topbar-right">
+        <span class="next-refresh" id="next-refresh">Próxima actualización: 5:00</span>
+        <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">
+          <i class="ti ti-refresh"></i> Actualizar
+        </button>
+      </div>
+    </div>
+
+    <!-- API key banner -->
+    <div class="api-banner" id="api-banner">
+      <i class="ti ti-alert-triangle"></i>
+      <span>
+        Clave de API no configurada. Edita <code>FINNHUB_KEY</code> en este archivo.
+        Obtén tu clave gratuita en <a href="https://finnhub.io" target="_blank">finnhub.io</a>.
+      </span>
+    </div>
+
+    <!-- Top 5 destacadas -->
+    <div class="section-label">Noticias destacadas</div>
+    <div class="cards-grid" id="cards-grid">
+      <div class="table-loading" style="grid-column:1/-1">
+        <div class="spinner"></div>
+        <div>Cargando noticias…</div>
+      </div>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="filter-row">
+      <button class="filter-pill active" data-cat="all"     onclick="setFilter('all')">Todos</button>
+      <button class="filter-pill"        data-cat="general" onclick="setFilter('general')">Mercados</button>
+      <button class="filter-pill"        data-cat="crypto"  onclick="setFilter('crypto')">Cripto</button>
+      <button class="filter-pill"        data-cat="forex"   onclick="setFilter('forex')">Divisa</button>
+      <button class="filter-pill"        data-cat="merger"  onclick="setFilter('merger')">Fusiones</button>
+      <span class="result-count" id="result-count"></span>
+    </div>
+
+    <!-- News table -->
+    <div class="section-label">Todas las noticias</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Hora</th>
+            <th>Categoría</th>
+            <th>Fuente</th>
+            <th>Titular</th>
+          </tr>
+        </thead>
+        <tbody id="news-tbody">
+          <tr><td colspan="4" class="table-loading">
+            <div class="spinner"></div><div>Cargando…</div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG  — sustituye con tu clave de finnhub.io (plan gratuito)
+// ═══════════════════════════════════════════════════════════════
+const FINNHUB_KEY = 'TU_API_KEY_AQUI';
+
+// ═══════════════════════════════════════════════════════════════
+// CATEGORY MAP
+// ═══════════════════════════════════════════════════════════════
+const CAT_MAP = {
+  general: { label: 'Mercados', color: '#3fb950', bg: 'rgba(63,185,80,0.1)'   },
+  crypto:  { label: 'Cripto',   color: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
+  forex:   { label: 'Divisa',   color: '#38bdf8', bg: 'rgba(56,189,248,0.1)'  },
+  merger:  { label: 'Fusiones', color: '#fb923c', bg: 'rgba(251,146,60,0.1)'  },
+};
+function catInfo(cat) {
+  return CAT_MAP[cat] || { label: cat, color: '#e6edf3', bg: 'rgba(255,255,255,0.06)' };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SCORING (for top-5)
+// ═══════════════════════════════════════════════════════════════
+function score(a) {
+  const w = { general: 4, merger: 3, forex: 2, crypto: 1 };
+  const ageMin = (Date.now() / 1000 - a.datetime) / 60;
+  const recency = Math.max(0, 1 - ageMin / 180);
+  return (w[a.category] || 1) * (1 + recency);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+let allArticles   = [];
+let activeFilter  = 'all';
+let refreshTimer  = null;
+let countdownSecs = 300;
+let countdownInt  = null;
+
+// ═══════════════════════════════════════════════════════════════
+// TIME HELPERS
+// ═══════════════════════════════════════════════════════════════
+function fmtHora(ts) {
+  const d = new Date(ts * 1000);
+  return d.getHours().toString().padStart(2,'0') + ':' +
+         d.getMinutes().toString().padStart(2,'0');
+}
+function fmtCountdown(s) {
+  const m = Math.floor(s / 60), ss = s % 60;
+  return m + ':' + ss.toString().padStart(2,'0');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FETCH NEWS
+// ═══════════════════════════════════════════════════════════════
+async function loadNews() {
+  const isPlaceholder = !FINNHUB_KEY || FINNHUB_KEY === 'TU_API_KEY_AQUI';
+  if (isPlaceholder) {
+    document.getElementById('api-banner').classList.add('visible');
+    renderEmpty();
+    return;
+  }
+
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  document.getElementById('status-text').textContent = 'Actualizando…';
+
+  const categories = ['general', 'crypto', 'forex', 'merger'];
+  const results = await Promise.allSettled(
+    categories.map(cat =>
+      fetch(`https://finnhub.io/api/v1/news?category=${cat}&token=${FINNHUB_KEY}`)
+        .then(r => r.ok ? r.json() : [])
+        .then(arr => arr.map(a => ({ ...a, category: cat })))
+        .catch(() => [])
+    )
+  );
+
+  const fetched = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+
+  if (fetched.length === 0) {
+    document.getElementById('api-banner').classList.add('visible');
+    renderEmpty();
+  } else {
+    document.getElementById('api-banner').classList.remove('visible');
+    // Deduplicate by URL
+    const seen = new Set();
+    allArticles = fetched.filter(a => {
+      if (!a.url || seen.has(a.url)) return false;
+      seen.add(a.url);
+      return true;
+    }).sort((a, b) => b.datetime - a.datetime);
+
+    renderCards();
+    renderTable();
+  }
+
+  btn.classList.remove('spinning');
+  document.getElementById('status-text').textContent = 'Actualización automática';
+  resetCountdown();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER — TOP 5 CARDS
+// ═══════════════════════════════════════════════════════════════
+function renderCards() {
+  const top5 = [...allArticles]
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, 5);
+
+  const grid = document.getElementById('cards-grid');
+  if (!top5.length) { grid.innerHTML = ''; return; }
+
+  grid.innerHTML = top5.map(a => {
+    const cat = catInfo(a.category);
+    const thumb = a.image
+      ? `<img class="card-thumb" src="${escHtml(a.image)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+      : '<div class="card-thumb-placeholder"></div>';
+    return `
+      <a class="news-card" href="${escHtml(a.url)}" target="_blank" rel="noopener"
+         style="--cat-color:${cat.color}">
+        <style>.news-card[href="${escHtml(a.url)}"]::before{background:${cat.color};}</style>
+        ${thumb}
+        <span class="card-cat-pill"
+              style="color:${cat.color};background:${cat.bg};border-color:${cat.color}40">
+          ${cat.label}
+        </span>
+        <div class="card-headline">${escHtml(a.headline)}</div>
+        <div class="card-meta">
+          <span>${escHtml(a.source || '')}</span>
+          <span>${fmtHora(a.datetime)}</span>
+        </div>
+      </a>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER — TABLE
+// ═══════════════════════════════════════════════════════════════
+function renderTable() {
+  const filtered = activeFilter === 'all'
+    ? allArticles
+    : allArticles.filter(a => a.category === activeFilter);
+
+  const shown = filtered.slice(0, 50);
+  document.getElementById('result-count').textContent =
+    shown.length + (filtered.length > 50 ? '+' : '') + ' noticias';
+
+  const tbody = document.getElementById('news-tbody');
+  if (!shown.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--txt-2)">
+      No hay noticias en esta categoría.
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = shown.map(a => {
+    const cat = catInfo(a.category);
+    return `
+      <tr>
+        <td class="td-hora">${fmtHora(a.datetime)}</td>
+        <td class="td-cat">
+          <span class="cat-pill"
+                style="color:${cat.color};background:${cat.bg};border-color:${cat.color}40">
+            ${cat.label}
+          </span>
+        </td>
+        <td class="td-src">${escHtml(a.source || '—')}</td>
+        <td class="td-tit">
+          <a href="${escHtml(a.url)}" target="_blank" rel="noopener">
+            ${escHtml(a.headline)}
+          </a>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function renderEmpty() {
+  document.getElementById('cards-grid').innerHTML = '';
+  document.getElementById('news-tbody').innerHTML =
+    `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--txt-2)">
+      Sin datos. Configura tu clave de API Finnhub.
+    </td></tr>`;
+  document.getElementById('result-count').textContent = '0 noticias';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FILTER
+// ═══════════════════════════════════════════════════════════════
+function setFilter(cat) {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-pill').forEach(el => {
+    el.classList.toggle('active', el.dataset.cat === cat);
+  });
+  renderTable();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COUNTDOWN & AUTO-REFRESH
+// ═══════════════════════════════════════════════════════════════
+function resetCountdown() {
+  countdownSecs = 300;
+  clearInterval(countdownInt);
+  countdownInt = setInterval(() => {
+    countdownSecs--;
+    document.getElementById('next-refresh').textContent =
+      'Próxima actualización: ' + fmtCountdown(countdownSecs);
+    if (countdownSecs <= 0) {
+      clearInterval(countdownInt);
+      loadNews();
+    }
+  }, 1000);
+}
+
+function manualRefresh() {
+  clearInterval(countdownInt);
+  loadNews();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HTML ESCAPE
+// ═══════════════════════════════════════════════════════════════
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════
+loadNews();
+</script>
+</body>
+</html>

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa Global · TFG Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+:root {
+  --bg-0:          #0d1117;
+  --bg-1:          #0d1117;
+  --bg-2:          rgba(255,255,255,0.03);
+  --bg-3:          rgba(255,255,255,0.06);
+  --line:          rgba(255,255,255,0.06);
+  --line-2:        rgba(255,255,255,0.12);
+  --txt-0:         #e6edf3;
+  --txt-1:         rgba(255,255,255,0.7);
+  --txt-2:         rgba(255,255,255,0.35);
+  --txt-3:         rgba(255,255,255,0.25);
+  --accent:        #3fb950;
+  --accent-dim:    rgba(63,185,80,0.12);
+  --red:           #f85149;
+  --amber:         #f0883e;
+  --blue:          #58a6ff;
+  --blue-dim:      rgba(88,166,255,0.12);
+  --blue-glow:     rgba(88,166,255,0.08);
+  --radius-s:      6px;
+  --radius-m:      10px;
+  --radius-l:      12px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-0);
+  color: var(--txt-0);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* ── Layout ── */
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+}
+.brand {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--accent), var(--blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--txt-2);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin-bottom: 36px;
+}
+.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-s);
+  color: var(--txt-1);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--bg-2); color: var(--txt-0); }
+.nav-item.active {
+  background: var(--blue-glow);
+  color: var(--blue);
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  background: var(--blue);
+  border-radius: 0 2px 2px 0;
+}
+.nav-item .ti { font-size: 18px; flex-shrink: 0; opacity: 0.75; }
+.nav-section {
+  font-size: 10px;
+  color: var(--txt-3);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 22px 14px 8px;
+}
+.status {
+  padding: 14px;
+  background: var(--bg-2);
+  border-radius: var(--radius-s);
+  font-size: 11px;
+  color: var(--txt-2);
+  margin-top: 24px;
+}
+.status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ── Main ── */
+.main {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  gap: 12px;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.tab-title {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.tab-sub { color: var(--txt-2); font-size: 12px; margin-top: 2px; }
+
+/* ── Indicator pills ── */
+.pills-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+.pills-row::-webkit-scrollbar { height: 3px; }
+.pills-row::-webkit-scrollbar-track { background: transparent; }
+.pills-row::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 2px; }
+.pill {
+  flex-shrink: 0;
+  padding: 5px 13px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+.pill:hover { border-color: rgba(255,255,255,0.2); color: rgba(255,255,255,0.75); }
+.pill.active {
+  background: rgba(63,185,80,0.12);
+  border-color: #3fb950;
+  color: #3fb950;
+}
+
+/* ── Map + Ranking layout ── */
+.map-layout {
+  display: grid;
+  grid-template-columns: 1fr 252px;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Map container ── */
+.map-container {
+  background: #080c12;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  position: relative;
+  overflow: hidden;
+}
+.map-container svg { display: block; }
+.map-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: #080c12;
+  z-index: 10;
+}
+.spinner {
+  width: 30px; height: 30px;
+  border: 2px solid rgba(255,255,255,0.07);
+  border-top-color: #3fb950;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.map-loading-text { font-size: 12px; color: var(--txt-2); }
+
+/* ── Ranking panel ── */
+.ranking-panel {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ranking-title {
+  font-size: 10px;
+  color: var(--txt-3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.rank-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.rank-item:hover { background: rgba(255,255,255,0.03); }
+.rank-item.hl { background: rgba(88,166,255,0.06); }
+.rank-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--txt-3);
+  width: 14px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.rank-flag { font-size: 16px; flex-shrink: 0; line-height: 1; }
+.rank-info { flex: 1; min-width: 0; }
+.rank-name {
+  font-size: 12px;
+  color: var(--txt-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rank-year { font-size: 10px; color: var(--txt-3); }
+.rank-val {
+  font-size: 11.5px;
+  font-family: 'DM Mono', monospace;
+  color: #3fb950;
+  text-align: right;
+  flex-shrink: 0;
+  max-width: 72px;
+  word-break: break-all;
+}
+
+/* ── Legend ── */
+.legend-bar {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+}
+.legend-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.legend-label { font-size: 11px; color: var(--txt-1); font-weight: 500; }
+.legend-unit  { font-size: 10px; color: var(--txt-3); }
+.legend-gradient {
+  height: 8px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+.legend-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  color: var(--txt-2);
+}
+
+/* ── Tooltip ── */
+.map-tooltip {
+  position: fixed;
+  background: #13181f;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 10px 13px;
+  pointer-events: none;
+  z-index: 1000;
+  max-width: 200px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+  display: none;
+}
+.tt-country { font-size: 13px; font-weight: 600; color: var(--txt-0); margin-bottom: 5px; }
+.tt-val  { font-family: 'DM Mono', monospace; font-size: 15px; color: #3fb950; }
+.tt-year { font-size: 10px; color: var(--txt-2); margin-top: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="brand">TFG.terminal</div>
+    <div class="brand-sub">Ignacio Rodríguez · UFV</div>
+    <nav class="nav">
+      <a href="index.html" class="nav-item"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-currency-bitcoin"></i>Cripto</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-trending-up"></i>Acciones</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-package"></i>Materias primas</a>
+      <div class="nav-section">Inteligencia</div>
+      <a href="index.html" class="nav-item"><i class="ti ti-brain"></i>Modelo TFG</a>
+      <a href="noticias.html" class="nav-item"><i class="ti ti-newspaper"></i>Noticias</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-calendar-event"></i>Calendario</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-world"></i>Macro</a>
+      <a href="mapa-global.html" class="nav-item active"><i class="ti ti-map-2"></i>Mapa Global</a>
+    </nav>
+    <div class="status">
+      <span class="status-dot"></span>
+      Banco Mundial API
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div>
+        <div class="tab-title">Mapa Global</div>
+        <div class="tab-sub">Indicadores macroeconómicos · Banco Mundial</div>
+      </div>
+    </div>
+
+    <!-- Indicator pills -->
+    <div class="pills-row" id="pills-row"></div>
+
+    <!-- Map + Ranking -->
+    <div class="map-layout">
+      <div class="map-container" id="map-container">
+        <div class="map-loading" id="map-loading">
+          <div class="spinner"></div>
+          <div class="map-loading-text">Cargando mapa y datos…</div>
+        </div>
+      </div>
+      <div class="ranking-panel" id="ranking-panel">
+        <div class="ranking-title">Top 10 países</div>
+        <div id="ranking-list"></div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend-bar" id="legend-bar">
+      <div class="legend-head">
+        <span class="legend-label" id="legend-label">Crecimiento PIB</span>
+        <span class="legend-unit"  id="legend-unit">%</span>
+      </div>
+      <div class="legend-gradient" id="legend-gradient"></div>
+      <div class="legend-ticks"   id="legend-ticks"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Tooltip -->
+<div class="map-tooltip" id="map-tooltip">
+  <div class="tt-country" id="tt-country"></div>
+  <div class="tt-val"     id="tt-val"></div>
+  <div class="tt-year"    id="tt-year"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 1. INDICATOR DEFINITIONS
+// ═══════════════════════════════════════════════════════════════
+const INDICATORS = [
+  { code: 'NY.GDP.MKTP.KD.ZG',    label: 'Crecimiento PIB',    unit: '%',      ramp: 'RdYlGn',  desc: true  },
+  { code: 'NY.GDP.MKTP.CD',       label: 'PIB total',          unit: 'USD',    ramp: 'Blues',   desc: true  },
+  { code: 'NY.GDP.PCAP.CD',       label: 'PIB per cápita',     unit: 'USD',    ramp: 'Blues',   desc: true  },
+  { code: 'FP.CPI.TOTL.ZG',      label: 'Inflación IPC',      unit: '%',      ramp: 'Reds',    desc: false },
+  { code: 'SL.UEM.TOTL.ZS',      label: 'Desempleo',          unit: '%',      ramp: 'Reds',    desc: false },
+  { code: 'NE.EXP.GNFS.ZS',      label: 'Exportaciones',      unit: '% PIB',  ramp: 'Greens',  desc: true  },
+  { code: 'NE.IMP.GNFS.ZS',      label: 'Importaciones',      unit: '% PIB',  ramp: 'Purples', desc: true  },
+  { code: 'NE.RSB.GNFS.CD',      label: 'Balanza comercial',  unit: 'USD',    ramp: 'RdYlGn',  desc: true  },
+  { code: 'BX.KLT.DINV.WD.GD.ZS',label: 'IED (% PIB)',        unit: '% PIB',  ramp: 'Greens',  desc: true  },
+  { code: 'GC.BAL.CASH.GD.ZS',   label: 'Saldo fiscal',       unit: '% PIB',  ramp: 'RdYlGn',  desc: true  },
+  { code: 'GC.DOD.TOTL.GD.ZS',   label: 'Deuda pública',      unit: '% PIB',  ramp: 'Reds',    desc: false },
+  { code: 'BN.CAB.XOKA.GD.ZS',   label: 'Cuenta corriente',   unit: '% PIB',  ramp: 'RdYlGn',  desc: true  },
+  { code: 'FI.RES.TOTL.CD',      label: 'Reservas divisas',   unit: 'USD',    ramp: 'Greens',  desc: true  },
+  { code: 'NY.GNS.ICTR.ZS',      label: 'Ahorro bruto',       unit: '% PIB',  ramp: 'Blues',   desc: true  },
+  { code: 'NE.GDI.TOTL.ZS',      label: 'Formación capital',  unit: '% PIB',  ramp: 'Blues',   desc: true  },
+  { code: 'SP.POP.TOTL',         label: 'Población',          unit: 'hab',    ramp: 'Purples', desc: true  },
+  { code: 'SP.DYN.LE00.IN',      label: 'Esperanza de vida',  unit: 'años',   ramp: 'Greens',  desc: true  },
+  { code: 'SE.ADT.LITR.ZS',      label: 'Alfabetización',     unit: '%',      ramp: 'Greens',  desc: true  },
+  { code: 'EG.USE.ELEC.KH.PC',   label: 'Consumo eléctrico',  unit: 'kWh/hab',ramp: 'Oranges', desc: true  },
+  { code: 'EN.ATM.CO2E.PC',      label: 'Emisiones CO₂',      unit: 't/hab',  ramp: 'Reds',    desc: false },
+  { code: 'EG.ELC.RNEW.ZS',      label: 'Energía renovable',  unit: '%',      ramp: 'Greens',  desc: true  },
+  { code: 'IT.NET.USER.ZS',      label: 'Usuarios internet',  unit: '%',      ramp: 'Blues',   desc: true  },
+  { code: 'MS.MIL.XPND.GD.ZS',  label: 'Gasto militar',      unit: '% PIB',  ramp: 'Reds',    desc: false },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// 2. ISO3 → ISO NUMERIC (TopoJSON join key)
+// ═══════════════════════════════════════════════════════════════
+const ISO3_NUM = {
+  AFG:4,ALB:8,DZA:12,AGO:24,ARG:32,ARM:51,AUS:36,AUT:40,AZE:31,
+  BHR:48,BGD:50,BLR:112,BEL:56,BOL:68,BIH:70,BWA:72,BRA:76,BGR:100,
+  BFA:854,CMR:120,CAN:124,CAF:140,TCD:148,CHL:152,CHN:156,COL:170,
+  COD:180,COG:178,CRI:188,CIV:384,HRV:191,CUB:192,CYP:196,CZE:203,
+  DNK:208,DOM:214,ECU:218,EGY:818,SLV:222,ERI:232,EST:233,ETH:231,
+  FIN:246,FRA:250,GAB:266,GEO:268,DEU:276,GHA:288,GRC:300,GTM:320,
+  GIN:324,GUY:328,HTI:332,HND:340,HUN:348,ISL:352,IND:356,IDN:360,
+  IRN:364,IRQ:368,IRL:372,ISR:376,ITA:380,JAM:388,JPN:392,JOR:400,
+  KAZ:398,KEN:404,PRK:408,KOR:410,KWT:414,KGZ:417,LAO:418,LVA:428,
+  LBN:422,LBY:434,LTU:440,LUX:442,MDG:450,MWI:454,MYS:458,MLI:466,
+  MLT:470,MRT:478,MEX:484,MDA:498,MNG:496,MNE:499,MAR:504,MOZ:508,
+  MMR:104,NAM:516,NPL:524,NLD:528,NZL:554,NIC:558,NER:562,NGA:566,
+  MKD:807,NOR:578,OMN:512,PAK:586,PAN:591,PRY:600,PER:604,PHL:608,
+  POL:616,PRT:620,QAT:634,ROU:642,RUS:643,SAU:682,SEN:686,SRB:688,
+  SGP:702,SVK:703,SVN:705,SOM:706,ZAF:710,SSD:728,ESP:724,LKA:144,
+  SDN:729,SWE:752,CHE:756,SYR:760,TWN:158,TJK:762,TZA:834,THA:764,
+  TGO:768,TTO:780,TUN:788,TUR:792,TKM:795,UGA:800,UKR:804,ARE:784,
+  GBR:826,USA:840,URY:858,UZB:860,VEN:862,VNM:704,YEM:887,ZMB:894,
+  ZWE:716,PSE:275,SWZ:748,BDI:108,BEN:204,CPV:132,COM:174,DJI:262,
+  GNQ:226,GNB:624,LSO:426,LBR:430,MDV:462,MUS:480,PNG:598,RWA:646,
+  SLE:694,SUR:740,TLS:626,AND:20,ATG:28,BHS:44,BRB:52,BLZ:84,BTN:64,
+  BRN:96,FJI:242,GMB:270,GRD:308,HTI:332,KIR:296,LIE:438,MCO:492,
+  NRU:520,PLW:585,KNA:659,LCA:662,VCT:670,WSM:882,STP:678,SMR:674,
+  TON:776,TUV:798,VUT:548,HKG:344
+};
+
+// Build reverse map
+const NUM_ISO3 = {};
+for (const [k, v] of Object.entries(ISO3_NUM)) NUM_ISO3[v] = k;
+
+// ═══════════════════════════════════════════════════════════════
+// 3. COUNTRY FLAGS & NAMES
+// ═══════════════════════════════════════════════════════════════
+const FLAGS = {
+  USA:'🇺🇸',CHN:'🇨🇳',IND:'🇮🇳',DEU:'🇩🇪',GBR:'🇬🇧',FRA:'🇫🇷',JPN:'🇯🇵',
+  BRA:'🇧🇷',CAN:'🇨🇦',RUS:'🇷🇺',AUS:'🇦🇺',KOR:'🇰🇷',MEX:'🇲🇽',IDN:'🇮🇩',
+  SAU:'🇸🇦',TUR:'🇹🇷',ARG:'🇦🇷',ZAF:'🇿🇦',NGA:'🇳🇬',EGY:'🇪🇬',IRN:'🇮🇷',
+  PAK:'🇵🇰',BGD:'🇧🇩',VNM:'🇻🇳',THA:'🇹🇭',MYS:'🇲🇾',PHL:'🇵🇭',COL:'🇨🇴',
+  CHL:'🇨🇱',PER:'🇵🇪',VEN:'🇻🇪',ECU:'🇪🇨',POL:'🇵🇱',NLD:'🇳🇱',BEL:'🇧🇪',
+  SWE:'🇸🇪',NOR:'🇳🇴',CHE:'🇨🇭',DNK:'🇩🇰',FIN:'🇫🇮',AUT:'🇦🇹',GRC:'🇬🇷',
+  PRT:'🇵🇹',ESP:'🇪🇸',ITA:'🇮🇹',CZE:'🇨🇿',HUN:'🇭🇺',ROU:'🇷🇴',UKR:'🇺🇦',
+  NZL:'🇳🇿',SGP:'🇸🇬',HKG:'🇭🇰',TWN:'🇹🇼',ARE:'🇦🇪',ISR:'🇮🇱',KAZ:'🇰🇿',
+  DZA:'🇩🇿',MAR:'🇲🇦',KEN:'🇰🇪',GHA:'🇬🇭',ETH:'🇪🇹',TZA:'🇹🇿',MOZ:'🇲🇿',
+  ZMB:'🇿🇲',AGO:'🇦🇴',CMR:'🇨🇲',CIV:'🇨🇮',SEN:'🇸🇳',UZB:'🇺🇿',AZE:'🇦🇿',
+  GEO:'🇬🇪',ARM:'🇦🇲',BLR:'🇧🇾',LTU:'🇱🇹',LVA:'🇱🇻',EST:'🇪🇪',SVK:'🇸🇰',
+  SVN:'🇸🇮',HRV:'🇭🇷',BIH:'🇧🇦',SRB:'🇷🇸',MKD:'🇲🇰',ALB:'🇦🇱',MDA:'🇲🇩',
+  BGR:'🇧🇬',CUB:'🇨🇺',DOM:'🇩🇴',GTM:'🇬🇹',HND:'🇭🇳',SLV:'🇸🇻',NIC:'🇳🇮',
+  CRI:'🇨🇷',PAN:'🇵🇦',JAM:'🇯🇲',TTO:'🇹🇹',BOL:'🇧🇴',PRY:'🇵🇾',URY:'🇺🇾',
+  IRQ:'🇮🇶',SYR:'🇸🇾',YEM:'🇾🇪',JOR:'🇯🇴',LBN:'🇱🇧',KWT:'🇰🇼',QAT:'🇶🇦',
+  OMN:'🇴🇲',BHR:'🇧🇭',LKA:'🇱🇰',NPL:'🇳🇵',MMR:'🇲🇲',KHM:'🇰🇭',LAO:'🇱🇦',
+  PRK:'🇰🇵',MNG:'🇲🇳',LBY:'🇱🇾',TUN:'🇹🇳',MLT:'🇲🇹',CYP:'🇨🇾',ISL:'🇮🇸',
+  LUX:'🇱🇺',IRL:'🇮🇪',MNE:'🇲🇪'
+};
+
+const NAMES = {
+  AFG:'Afganistán',ALB:'Albania',DZA:'Argelia',AGO:'Angola',ARG:'Argentina',
+  ARM:'Armenia',AUS:'Australia',AUT:'Austria',AZE:'Azerbaiyán',BHR:'Baréin',
+  BGD:'Bangladés',BLR:'Bielorrusia',BEL:'Bélgica',BOL:'Bolivia',BIH:'Bosnia',
+  BWA:'Botsuana',BRA:'Brasil',BGR:'Bulgaria',CMR:'Camerún',CAN:'Canadá',
+  CHL:'Chile',CHN:'China',COL:'Colombia',COD:'R.D. Congo',CRI:'Costa Rica',
+  HRV:'Croacia',CUB:'Cuba',CYP:'Chipre',CZE:'Chequia',DNK:'Dinamarca',
+  DOM:'R. Dominicana',ECU:'Ecuador',EGY:'Egipto',SLV:'El Salvador',
+  EST:'Estonia',ETH:'Etiopía',FIN:'Finlandia',FRA:'Francia',GEO:'Georgia',
+  DEU:'Alemania',GHA:'Ghana',GRC:'Grecia',GTM:'Guatemala',HND:'Honduras',
+  HUN:'Hungría',ISL:'Islandia',IND:'India',IDN:'Indonesia',IRN:'Irán',
+  IRQ:'Irak',IRL:'Irlanda',ISR:'Israel',ITA:'Italia',JAM:'Jamaica',
+  JPN:'Japón',JOR:'Jordania',KAZ:'Kazajistán',KEN:'Kenia',KOR:'Corea del Sur',
+  KWT:'Kuwait',KGZ:'Kirguistán',LAO:'Laos',LVA:'Letonia',LBN:'Líbano',
+  LBY:'Libia',LTU:'Lituania',LUX:'Luxemburgo',MYS:'Malasia',MLT:'Malta',
+  MEX:'México',MDA:'Moldavia',MNG:'Mongolia',MAR:'Marruecos',MOZ:'Mozambique',
+  MMR:'Myanmar',NPL:'Nepal',NLD:'Países Bajos',NZL:'Nueva Zelanda',
+  NIC:'Nicaragua',NER:'Níger',NGA:'Nigeria',MKD:'N. Macedonia',NOR:'Noruega',
+  OMN:'Omán',PAK:'Pakistán',PAN:'Panamá',PRY:'Paraguay',PER:'Perú',
+  PHL:'Filipinas',POL:'Polonia',PRT:'Portugal',QAT:'Catar',ROU:'Rumanía',
+  RUS:'Rusia',SAU:'Arabia Saudí',SEN:'Senegal',SRB:'Serbia',SGP:'Singapur',
+  SVK:'Eslovaquia',SVN:'Eslovenia',SOM:'Somalia',ZAF:'Sudáfrica',ESP:'España',
+  LKA:'Sri Lanka',SDN:'Sudán',SWE:'Suecia',CHE:'Suiza',SYR:'Siria',
+  TWN:'Taiwán',TJK:'Tayikistán',TZA:'Tanzania',THA:'Tailandia',TGO:'Togo',
+  TTO:'Trinidad',TUN:'Túnez',TUR:'Turquía',TKM:'Turkmenistán',UGA:'Uganda',
+  UKR:'Ucrania',ARE:'Emiratos Árabes',GBR:'Reino Unido',USA:'EE. UU.',
+  URY:'Uruguay',UZB:'Uzbekistán',VEN:'Venezuela',VNM:'Vietnam',YEM:'Yemen',
+  ZMB:'Zambia',ZWE:'Zimbabue',CIV:'Costa de Marfil',PRK:'Corea del Norte',
+  PSE:'Palestina',HKG:'Hong Kong',MNE:'Montenegro',BFA:'Burkina Faso',
+  MLI:'Malí',NER:'Níger',TCD:'Chad',CAF:'R. Centroafricana',ETH:'Etiopía',
+  SSD:'Sudán del Sur',ERI:'Eritrea',GIN:'Guinea',GNB:'Guinea-Bisáu',
+  SLE:'Sierra Leona',LBR:'Liberia',GMB:'Gambia',GNQ:'Guinea Ec.',
+  SWZ:'Suazilandia',LSO:'Lesoto',MDG:'Madagascar',BWA:'Botsuana',
+  ZMB:'Zambia',ZWE:'Zimbabue',MWI:'Malaui',RWA:'Ruanda',BDI:'Burundi',
+  TZA:'Tanzania',KEN:'Kenia',UGA:'Uganda',COM:'Comoras',MUS:'Mauricio',
+  CPV:'Cabo Verde',STP:'Santo Tomé',DJI:'Yibuti',ERI:'Eritrea',
+  SOM:'Somalia',NAM:'Namibia',GAB:'Gabón',COG:'Congo',COD:'R.D. Congo',
+  CAF:'R. Centroafricana',CMR:'Camerún',NGA:'Nigeria',BEN:'Benín',
+  TGO:'Togo',GHA:'Ghana',CIV:'Costa de Marfil',BFA:'Burkina Faso',
+  MLI:'Malí',SEN:'Senegal',GIN:'Guinea',SLE:'Sierra Leona',LBR:'Liberia',
+  GMB:'Gambia',GNB:'Guinea-Bisáu',GNQ:'Guinea Ec.',MRT:'Mauritania',
+  MAR:'Marruecos',DZA:'Argelia',TUN:'Túnez',LBY:'Libia',EGY:'Egipto',
+  SDN:'Sudán',SSD:'Sudán del Sur',ETH:'Etiopía',ERI:'Eritrea',
+  IRL:'Irlanda',ISL:'Islandia',CYP:'Chipre',MLT:'Malta'
+};
+function cname(iso3) { return NAMES[iso3] || iso3; }
+
+// ═══════════════════════════════════════════════════════════════
+// 4. VALUE FORMATTER
+// ═══════════════════════════════════════════════════════════════
+function fmtVal(v, code) {
+  if (v === null || v === undefined || isNaN(v)) return 'Sin datos';
+  const F = {
+    'NY.GDP.MKTP.CD':    x => '$' + (x/1e12).toFixed(2) + 'T',
+    'NY.GDP.MKTP.KD':    x => '$' + (x/1e12).toFixed(2) + 'T',
+    'NY.GDP.PCAP.CD':    x => '$' + Math.round(x).toLocaleString('es-ES'),
+    'FI.RES.TOTL.CD':    x => '$' + (x/1e9).toFixed(1) + 'B',
+    'NE.RSB.GNFS.CD':    x => (x >= 0 ? '+$' : '-$') + (Math.abs(x)/1e9).toFixed(1) + 'B',
+    'SP.POP.TOTL':       x => (x/1e6).toFixed(1) + 'M',
+    'SP.DYN.LE00.IN':    x => x.toFixed(1) + ' años',
+    'EG.USE.ELEC.KH.PC': x => Math.round(x).toLocaleString('es-ES') + ' kWh',
+    'EN.ATM.CO2E.PC':    x => x.toFixed(2) + ' t',
+  };
+  if (F[code]) return F[code](v);
+  return v.toFixed(2) + '%';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 5. COLOR SCALES
+// ═══════════════════════════════════════════════════════════════
+const INTERPS = {
+  Blues:   d3.interpolateBlues,
+  Greens:  d3.interpolateGreens,
+  Purples: d3.interpolatePurples,
+  Reds:    d3.interpolateReds,
+  Oranges: d3.interpolateOranges,
+};
+
+function buildScale(vals, ramp) {
+  const v = vals.filter(x => x != null && !isNaN(x));
+  if (!v.length) return () => '#1a2030';
+  const mn = d3.min(v), mx = d3.max(v);
+  if (mn === mx) return () => '#3fb950';
+  if (ramp === 'RdYlGn') {
+    return d3.scaleDiverging(d3.interpolateRdYlGn).domain([mn, (mn+mx)/2, mx]);
+  }
+  return d3.scaleSequential(INTERPS[ramp] || d3.interpolateBlues).domain([mn, mx]);
+}
+
+function gradientCSS(ramp, n = 16) {
+  const stops = Array.from({length: n+1}, (_, i) => {
+    const t = i / n;
+    if (ramp === 'RdYlGn') return d3.interpolateRdYlGn(t);
+    return (INTERPS[ramp] || d3.interpolateBlues)(t);
+  });
+  return `linear-gradient(to right, ${stops.join(',')})`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 6. STATE & GLOBALS
+// ═══════════════════════════════════════════════════════════════
+window.wbCache   = {};
+window.worldTopo = null;
+
+let active   = INDICATORS[0];
+let data     = {};         // ISO3 → { value, date }
+let cscale   = () => '#1a2030';
+let svgEl, gEl, pathFn, zoomBx;
+
+// ═══════════════════════════════════════════════════════════════
+// 7. PILLS
+// ═══════════════════════════════════════════════════════════════
+function renderPills() {
+  const row = document.getElementById('pills-row');
+  row.innerHTML = '';
+  INDICATORS.forEach(ind => {
+    const b = document.createElement('button');
+    b.className = 'pill' + (ind.code === active.code ? ' active' : '');
+    b.textContent = ind.label;
+    b.onclick = () => selectIndicator(ind);
+    row.appendChild(b);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 8. WORLD BANK FETCH
+// ═══════════════════════════════════════════════════════════════
+async function fetchWB(code) {
+  if (window.wbCache[code]) return window.wbCache[code];
+  const url =
+    `https://api.worldbank.org/v2/country/all/indicator/${code}` +
+    `?format=json&mrv=1&per_page=300&gapfill=Y`;
+  try {
+    const r    = await fetch(url);
+    const json = await r.json();
+    const rows = json[1] || [];
+    const map  = {};
+    for (const row of rows) {
+      if (row.countryiso3code && row.value !== null && row.value !== undefined) {
+        map[row.countryiso3code] = { value: +row.value, date: row.date };
+      }
+    }
+    window.wbCache[code] = map;
+    return map;
+  } catch (e) {
+    console.error('WB fetch error:', e);
+    return {};
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 9. MAP INIT
+// ═══════════════════════════════════════════════════════════════
+async function initMap() {
+  const wrap = document.getElementById('map-container');
+  const { width, height } = wrap.getBoundingClientRect();
+
+  projection = d3.geoNaturalEarth1()
+    .scale((width / 6.28) * 0.88)
+    .translate([width / 2, height / 2]);
+  pathFn = d3.geoPath().projection(projection);
+
+  svgEl = d3.select('#map-container')
+    .append('svg')
+    .attr('width',  width)
+    .attr('height', height)
+    .style('display', 'block');
+
+  zoomBx = d3.zoom()
+    .scaleExtent([1, 10])
+    .on('zoom', e => gEl.attr('transform', e.transform));
+  svgEl.call(zoomBx);
+
+  gEl = svgEl.append('g').attr('class', 'countries-g');
+
+  // Load world topology
+  if (!window.worldTopo) {
+    window.worldTopo = await d3.json(
+      'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
+    );
+  }
+  const countries = topojson.feature(
+    window.worldTopo,
+    window.worldTopo.objects.countries
+  );
+
+  gEl.selectAll('path.ctry')
+    .data(countries.features)
+    .enter().append('path')
+    .attr('class', 'ctry')
+    .attr('d', pathFn)
+    .attr('fill',         '#1a2030')
+    .attr('stroke',       'rgba(255,255,255,0.07)')
+    .attr('stroke-width', 0.4)
+    .on('mouseover', onOver)
+    .on('mousemove',  onMove)
+    .on('mouseout',  onOut);
+
+  // Resize
+  const debouncedResize = debounce(() => {
+    const r = wrap.getBoundingClientRect();
+    svgEl.attr('width', r.width).attr('height', r.height);
+    projection
+      .scale((r.width / 6.28) * 0.88)
+      .translate([r.width / 2, r.height / 2]);
+    pathFn = d3.geoPath().projection(projection);
+    gEl.selectAll('path.ctry').attr('d', pathFn);
+  }, 200);
+  window.addEventListener('resize', debouncedResize);
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 10. UPDATE MAP COLORS
+// ═══════════════════════════════════════════════════════════════
+function repaint() {
+  const vals = Object.values(data).map(d => d.value);
+  cscale = buildScale(vals, active.ramp);
+
+  gEl.selectAll('path.ctry').attr('fill', d => {
+    const iso3 = NUM_ISO3[+d.id];
+    if (!iso3) return '#1a2030';
+    const entry = data[iso3];
+    if (!entry) return '#1a2030';
+    return cscale(entry.value);
+  });
+
+  updateLegend(vals);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 11. LEGEND
+// ═══════════════════════════════════════════════════════════════
+function updateLegend(vals) {
+  const { label, unit, ramp, code } = active;
+  document.getElementById('legend-label').textContent = label;
+  document.getElementById('legend-unit').textContent  = unit;
+  document.getElementById('legend-gradient').style.background = gradientCSS(ramp);
+
+  const v = vals.filter(x => x != null && !isNaN(x));
+  const ticks = document.getElementById('legend-ticks');
+  if (!v.length) { ticks.innerHTML = ''; return; }
+  const mn = d3.min(v), mx = d3.max(v);
+  ticks.innerHTML = [0, 0.25, 0.5, 0.75, 1]
+    .map(t => `<span>${fmtVal(mn + t*(mx-mn), code)}</span>`)
+    .join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 12. RANKING SIDEBAR
+// ═══════════════════════════════════════════════════════════════
+function updateRanking() {
+  const { code, desc } = active;
+  const entries = Object.entries(data)
+    .filter(([, d]) => d.value != null)
+    .sort((a, b) => desc ? b[1].value - a[1].value : a[1].value - b[1].value)
+    .slice(0, 10);
+
+  document.getElementById('ranking-list').innerHTML = entries.map(([iso3, d], i) => `
+    <div class="rank-item" id="ri-${iso3}"
+         onmouseenter="hlCountry('${iso3}',true)"
+         onmouseleave="hlCountry('${iso3}',false)">
+      <span class="rank-num">${i + 1}</span>
+      <span class="rank-flag">${FLAGS[iso3] || '🏳'}</span>
+      <div class="rank-info">
+        <div class="rank-name">${cname(iso3)}</div>
+        <div class="rank-year">${d.date || ''}</div>
+      </div>
+      <div class="rank-val">${fmtVal(d.value, code)}</div>
+    </div>
+  `).join('');
+}
+
+function hlCountry(iso3, on) {
+  const num = ISO3_NUM[iso3];
+  if (!num) return;
+  gEl.selectAll('path.ctry')
+    .filter(d => +d.id === num)
+    .attr('stroke',       on ? '#58a6ff' : 'rgba(255,255,255,0.07)')
+    .attr('stroke-width', on ? 1.8 : 0.4);
+  const ri = document.getElementById('ri-' + iso3);
+  if (ri) ri.classList.toggle('hl', on);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 13. TOOLTIP HANDLERS
+// ═══════════════════════════════════════════════════════════════
+const ttEl = document.getElementById('map-tooltip');
+
+function onOver(event, d) {
+  const iso3  = NUM_ISO3[+d.id];
+  const entry = iso3 ? data[iso3] : null;
+  document.getElementById('tt-country').textContent =
+    (iso3 ? cname(iso3) : 'País') + ' ' + (FLAGS[iso3] || '');
+  document.getElementById('tt-val').textContent =
+    entry ? fmtVal(entry.value, active.code) : 'Sin datos';
+  document.getElementById('tt-year').textContent =
+    entry ? 'Año: ' + entry.date : '';
+  ttEl.style.display = 'block';
+  d3.select(event.currentTarget)
+    .attr('stroke', '#e6edf3')
+    .attr('stroke-width', 1.2);
+}
+
+function onMove(event) {
+  const ttW = 200, ttH = 80;
+  const x   = event.clientX + 14;
+  const y   = event.clientY - 30;
+  ttEl.style.left = (x + ttW > window.innerWidth  ? event.clientX - ttW - 14 : x) + 'px';
+  ttEl.style.top  = (y + ttH > window.innerHeight ? event.clientY - ttH - 10 : y) + 'px';
+}
+
+function onOut() {
+  ttEl.style.display = 'none';
+  gEl.selectAll('path.ctry')
+    .attr('stroke', 'rgba(255,255,255,0.07)')
+    .attr('stroke-width', 0.4);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 14. SELECT INDICATOR
+// ═══════════════════════════════════════════════════════════════
+async function selectIndicator(ind) {
+  active = ind;
+  renderPills();
+  const loading = document.getElementById('map-loading');
+  loading.style.display = 'flex';
+  data = await fetchWB(ind.code);
+  loading.style.display = 'none';
+  repaint();
+  updateRanking();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 15. BOOT
+// ═══════════════════════════════════════════════════════════════
+(async function boot() {
+  renderPills();
+  await initMap();
+  await selectIndicator(INDICATORS[0]);
+}());
+</script>
+</body>
+</html>
