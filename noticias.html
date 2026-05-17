@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noticias · TFG Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+<link rel="stylesheet" href="redesign.css"/>
+<script src="redesign-pre.js"></script>
+<style>
+:root {
+  --bg-0:           #0d1117;
+  --bg-1:           #0d1117;
+  --bg-2:           rgba(255,255,255,0.03);
+  --bg-3:           rgba(255,255,255,0.06);
+  --bg-card:        rgba(255,255,255,0.02);
+  --bg-card-hover:  rgba(255,255,255,0.04);
+  --line:           rgba(255,255,255,0.06);
+  --line-2:         rgba(255,255,255,0.12);
+  --border-subtle:  rgba(255,255,255,0.06);
+  --border-hover:   rgba(255,255,255,0.12);
+  --txt-0:          #e6edf3;
+  --txt-1:          rgba(255,255,255,0.7);
+  --txt-2:          rgba(255,255,255,0.35);
+  --txt-3:          rgba(255,255,255,0.25);
+  --accent:         #3fb950;
+  --accent-green:   #3fb950;
+  --accent-red:     #f85149;
+  --accent-orange:  #f0883e;
+  --accent-blue:    #58a6ff;
+  --accent-purple:  #d2a8ff;
+  --pill-green-bg:  rgba(63,185,80,0.1);
+  --pill-red-bg:    rgba(248,81,73,0.1);
+  --pill-blue-bg:   rgba(88,166,255,0.1);
+  --pill-orange-bg: rgba(240,136,62,0.1);
+  --pill-purple-bg: rgba(210,168,255,0.1);
+  --blue:           #58a6ff;
+  --blue-glow:      rgba(88,166,255,0.08);
+  --radius-s:       6px;
+  --radius-m:       10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-0);
+  color: var(--txt-0);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ── */
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
+  padding: 28px 20px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.brand {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--accent), var(--blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--txt-2);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin-bottom: 36px;
+}
+.nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-s);
+  color: var(--txt-1);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--bg-2); color: var(--txt-0); }
+.nav-item.active { background: var(--blue-glow); color: var(--blue); }
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -20px; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 18px;
+  background: var(--blue);
+  border-radius: 0 2px 2px 0;
+}
+.nav-item .ti { font-size: 18px; flex-shrink: 0; opacity: 0.75; }
+.nav-section {
+  font-size: 10px;
+  color: var(--txt-3);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  padding: 22px 14px 8px;
+}
+.status {
+  padding: 14px;
+  background: var(--bg-2);
+  border-radius: var(--radius-s);
+  font-size: 11px;
+  color: var(--txt-2);
+  margin-top: 24px;
+}
+.status-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-right: 6px;
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ── Main ── */
+.main { padding: 28px 36px; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+.tab-title {
+  font-family: 'Fraunces', serif;
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.tab-sub { color: var(--txt-2); font-size: 13px; margin-top: 4px; }
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--line-2);
+  background: var(--bg-2);
+  color: var(--txt-1);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.refresh-btn:hover { background: var(--bg-3); color: var(--txt-0); }
+.refresh-btn .ti { font-size: 15px; }
+
+/* ── Section label ── */
+.section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--txt-3);
+  margin-bottom: 12px;
+}
+
+/* ── Top 5 cards ── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.news-card {
+  background: var(--bg-card);
+  border: 0.5px solid var(--border-subtle);
+  border-radius: var(--radius-m);
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  color: inherit;
+  position: relative;
+  overflow: hidden;
+}
+.news-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--card-accent, var(--accent));
+  opacity: 0.7;
+}
+.news-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+}
+.card-source-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  align-self: flex-start;
+}
+.card-headline {
+  font-size: 12.5px;
+  color: var(--txt-0);
+  line-height: 1.45;
+  font-weight: 500;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-summary {
+  font-size: 11px;
+  color: var(--txt-2);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-meta {
+  font-size: 10px;
+  color: var(--txt-3);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.imp-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* ── Filter pills ── */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.filter-pill {
+  padding: 5px 14px;
+  border-radius: 16px;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.filter-pill:hover { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.7); }
+.filter-pill.active {
+  background: var(--pill-blue-bg);
+  color: var(--accent-blue);
+  border-color: rgba(88,166,255,0.3);
+}
+
+/* ── News list (same as index.html) ── */
+.news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.news-item {
+  padding: 12px 14px;
+  border-radius: var(--radius-s);
+  background: var(--bg-2);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.news-item:hover { border-color: var(--line-2); }
+.news-title { font-size: 13px; color: var(--txt-0); line-height: 1.45; }
+.news-importance-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.news-importance-high   { background: var(--accent-red);    box-shadow: 0 0 6px rgba(248,81,73,0.4); }
+.news-importance-medium { background: var(--accent-orange); }
+.news-importance-low    { background: var(--accent-green);  }
+
+/* ── Loading ── */
+.loading-state {
+  text-align: center;
+  padding: 48px;
+  color: var(--txt-2);
+  font-size: 13px;
+}
+.spinner {
+  display: inline-block;
+  width: 24px; height: 24px;
+  border: 2px solid rgba(255,255,255,0.07);
+  border-top-color: #3fb950;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  margin-bottom: 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="brand">TFG.terminal</div>
+    <div class="brand-sub">Ignacio Rodríguez · UFV</div>
+    <nav class="nav">
+      <a href="index.html" class="nav-item"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-currency-bitcoin"></i>Cripto</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-trending-up"></i>Acciones</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-package"></i>Materias primas</a>
+      <div class="nav-section">Inteligencia</div>
+      <a href="index.html" class="nav-item"><i class="ti ti-brain"></i>Modelo TFG</a>
+      <a href="noticias.html" class="nav-item active"><i class="ti ti-newspaper"></i>Noticias</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-calendar-event"></i>Calendario</a>
+      <a href="index.html" class="nav-item"><i class="ti ti-world"></i>Macro</a>
+      <a href="mapa-global.html" class="nav-item"><i class="ti ti-map-2"></i>Mapa Global</a>
+      <a href="flujos-globales.html" class="nav-item"><i class="ti ti-route"></i>Flujos Globales</a>
+    </nav>
+    <div class="status">
+      <span class="status-dot"></span>
+      <span id="status-text">Cargando…</span>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+
+    <div class="topbar">
+      <div>
+        <div class="tab-title">Noticias</div>
+        <div class="tab-sub" id="tab-sub">Agregador de noticias financieras y cripto</div>
+      </div>
+      <button class="refresh-btn" onclick="loadData()">
+        <i class="ti ti-refresh"></i> Actualizar
+      </button>
+    </div>
+
+    <!-- Top 5 destacadas -->
+    <div class="section-label">Destacadas</div>
+    <div class="cards-grid" id="cards-grid">
+      <div class="loading-state" style="grid-column:1/-1">
+        <div><div class="spinner"></div></div>Cargando noticias…
+      </div>
+    </div>
+
+    <!-- Filtros + lista completa -->
+    <div class="filter-row" id="news-filters">
+      <button class="filter-pill active" data-source="all">Todas</button>
+    </div>
+    <div class="section-label">Todas las noticias</div>
+    <div class="news-list" id="news-list">
+      <div class="loading-state">
+        <div><div class="spinner"></div></div>Cargando…
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ─── Estado ───────────────────────────────────────────────────
+let allNews     = [];
+let activeSource = 'all';
+
+// ─── Helpers ──────────────────────────────────────────────────
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/[&<>"]/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  const d    = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const diff = (Date.now() - d.getTime()) / 1000;
+  if (diff < 60)    return `hace ${Math.floor(diff)}s`;
+  if (diff < 3600)  return `hace ${Math.floor(diff / 60)}min`;
+  if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+  return d.toLocaleDateString('es-ES');
+}
+
+function importanceClass(title) {
+  const t   = (title || '').toLowerCase();
+  const HI  = ['strike','war','regulation','sec','ban','crash','hack','ipo',
+                'sanction','arrest','fed','rate','inflation','gdp','crisis'];
+  const MED = ['earning','partner','deploy','launch','acqui','merger',
+                'upgrade','downgrade','result'];
+  if (HI.some(w  => t.includes(w))) return 'high';
+  if (MED.some(w => t.includes(w))) return 'medium';
+  return 'low';
+}
+
+const SOURCE_MAP = {
+  cointelegraph: { color: 'var(--accent-blue)',   bg: 'var(--pill-blue-bg)'   },
+  coindesk:      { color: 'var(--accent-purple)', bg: 'var(--pill-purple-bg)' },
+  'ft markets':  { color: 'var(--accent-green)',  bg: 'var(--pill-green-bg)'  },
+  reuters:       { color: 'var(--accent-orange)', bg: 'var(--pill-orange-bg)' },
+  bloomberg:     { color: 'var(--accent-orange)', bg: 'var(--pill-orange-bg)' },
+  wsj:           { color: 'var(--accent-blue)',   bg: 'var(--pill-blue-bg)'   },
+};
+function srcStyle(src) {
+  const key = (src || '').toLowerCase();
+  for (const [k, v] of Object.entries(SOURCE_MAP)) {
+    if (key.includes(k)) return v;
+  }
+  // genera un color consistente por fuente
+  const palette = [
+    { color:'var(--accent-blue)',   bg:'var(--pill-blue-bg)'   },
+    { color:'var(--accent-green)',  bg:'var(--pill-green-bg)'  },
+    { color:'var(--accent-orange)', bg:'var(--pill-orange-bg)' },
+    { color:'var(--accent-purple)', bg:'var(--pill-purple-bg)' },
+  ];
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = ((hash << 5) - hash) + key.charCodeAt(i);
+  return palette[Math.abs(hash) % palette.length];
+}
+
+// ─── Fetch data/live_data.json ────────────────────────────────
+async function loadData() {
+  document.getElementById('status-text').textContent = 'Actualizando…';
+  try {
+    const r = await fetch('data/live_data.json?ts=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    allNews = d.news || [];
+    if (allNews.length) {
+      document.getElementById('status-text').textContent =
+        'Actualizado · ' + timeAgo(d.updated_at);
+      document.getElementById('tab-sub').textContent =
+        allNews.length + ' noticias · ' + timeAgo(d.updated_at);
+    } else {
+      document.getElementById('status-text').textContent = 'Sin noticias';
+    }
+  } catch (e) {
+    console.error(e);
+    document.getElementById('status-text').textContent = 'Error al cargar';
+    document.getElementById('cards-grid').innerHTML =
+      '<div class="loading-state" style="grid-column:1/-1">No se pudo cargar <code>data/live_data.json</code>.</div>';
+    document.getElementById('news-list').innerHTML = '';
+    return;
+  }
+  renderAll();
+}
+
+// ─── Render top-5 tarjetas ────────────────────────────────────
+function renderCards() {
+  const grid = document.getElementById('cards-grid');
+  const top5 = allNews.slice(0, 5);
+  if (!top5.length) { grid.innerHTML = ''; return; }
+
+  grid.innerHTML = top5.map(n => {
+    const st  = srcStyle(n.source);
+    const imp = importanceClass(n.title);
+    const impColors = {
+      high:   'var(--accent-red)',
+      medium: 'var(--accent-orange)',
+      low:    'var(--accent-green)',
+    };
+    const accentColor = impColors[imp];
+    return `
+      <a class="news-card" href="${esc(n.link)}" target="_blank" rel="noopener"
+         style="--card-accent:${accentColor}">
+        <span class="card-source-pill"
+              style="color:${st.color};background:${st.bg}">
+          ${esc(n.source || '—')}
+        </span>
+        <div class="card-headline">${esc(n.title)}</div>
+        ${n.summary
+          ? `<div class="card-summary">${esc(n.summary.slice(0, 120))}…</div>`
+          : ''}
+        <div class="card-meta">
+          <span class="imp-dot" style="background:${accentColor}"></span>
+          ${timeAgo(n.published)}
+        </div>
+      </a>`;
+  }).join('');
+}
+
+// ─── Render filtros ───────────────────────────────────────────
+function renderFilters() {
+  const filtersEl = document.getElementById('news-filters');
+  const sources   = [...new Set(allNews.map(n => n.source).filter(Boolean))].slice(0, 7);
+  filtersEl.innerHTML =
+    `<button class="filter-pill${activeSource === 'all' ? ' active' : ''}"
+             data-source="all" onclick="setFilter('all')">Todas</button>` +
+    sources.map(s =>
+      `<button class="filter-pill${activeSource === s ? ' active' : ''}"
+               data-source="${esc(s)}" onclick="setFilter('${esc(s)}')">${esc(s)}</button>`
+    ).join('');
+}
+
+// ─── Render lista de noticias ─────────────────────────────────
+function renderList() {
+  const el       = document.getElementById('news-list');
+  const rest     = allNews.slice(5); // omitimos las primeras 5 (ya están en las tarjetas)
+  const filtered = activeSource === 'all'
+    ? rest
+    : rest.filter(n => n.source === activeSource);
+
+  if (!filtered.length) {
+    el.innerHTML = '<div class="loading-state">Sin noticias para esta fuente.</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.slice(0, 60).map(n => {
+    const imp = importanceClass(n.title);
+    const st  = srcStyle(n.source);
+    return `
+      <a href="${esc(n.link)}" target="_blank" rel="noopener" style="text-decoration:none">
+        <div class="news-item">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+            <span class="news-importance-dot news-importance-${imp}"></span>
+            <span style="font-size:8px;font-weight:600;text-transform:uppercase;
+                         letter-spacing:0.8px;padding:3px 7px;border-radius:3px;
+                         background:${st.bg};color:${st.color}">
+              ${esc(n.source || '')}
+            </span>
+            <span style="font-size:10px;color:rgba(255,255,255,0.2)">${timeAgo(n.published)}</span>
+          </div>
+          <div class="news-title">${esc(n.title)}</div>
+        </div>
+      </a>`;
+  }).join('');
+}
+
+function renderAll() {
+  renderCards();
+  renderFilters();
+  renderList();
+}
+
+function setFilter(src) {
+  activeSource = src;
+  renderFilters();
+  renderList();
+}
+
+// ─── Boot ─────────────────────────────────────────────────────
+loadData();
+</script>
+<script src="redesign-noticias.js"></script>
+</body>
+</html>
