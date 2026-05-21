@@ -1208,7 +1208,7 @@
    │  Stocks v2 (sector heatmap + filters) │
    ╰───────────────────────────────────────╯ */
 .r-stocks-filters {
-  display: flex; gap: 16px; flex-wrap: wrap;
+  display: flex !important; gap: 16px; flex-wrap: wrap;
   background: var(--r-bg-card);
   border: 0.5px solid var(--r-border);
   border-radius: 14px;
@@ -1217,9 +1217,40 @@
   align-items: center;
 }
 .r-stocks-filter-group {
-  display: flex; align-items: center; gap: 8px;
+  display: flex !important; align-items: center; gap: 8px;
   flex-wrap: wrap;
 }
+.r-stocks-heatmap-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 4px;
+}
+.r-stocks-heat-cell {
+  padding: 12px 14px !important;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex !important; flex-direction: column !important;
+  min-height: 86px;
+}
+.r-tfg-stats {
+  display: grid !important; grid-template-columns: repeat(4, 1fr) !important;
+  gap: 14px; margin-bottom: 18px;
+}
+.r-tfg-pos {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) auto !important;
+}
+.r-tfg-sig-grid {
+  display: grid !important; grid-template-columns: repeat(5, 1fr) !important;
+}
+.r-tfg-rules { display: grid !important; grid-template-columns: 1fr 1fr !important; }
+.r-tfg-rule-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; }
+.r-tfg-table { width: 100% !important; border-collapse: collapse !important; display: table !important; }
+.r-tfg-table thead { display: table-header-group !important; }
+.r-tfg-table tbody { display: table-row-group !important; }
+.r-tfg-table tr { display: table-row !important; }
+.r-tfg-table th, .r-tfg-table td { display: table-cell !important; }
 .r-stocks-filter-label {
   font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
   color: var(--text-muted); font-weight: 600; margin-right: 4px;
