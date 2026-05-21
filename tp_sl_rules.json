@@ -1,0 +1,33 @@
+{
+  "_note": "Percentiles GARCH calculados con np.percentile(garch_vol_t1_train,[40,50,60,70,80]) sobre el train set. Actualizar si se re-entrena el modelo.",
+  "version": "sharpe",
+  "filters": {
+    "min_confidence": 0.60,
+    "max_garch_pct": "p80",
+    "max_p_deadzone": 0.38,
+    "direction": "LONG"
+  },
+  "garch_percentiles": {
+    "p40": 0.00182,
+    "p50": 0.00221,
+    "p60": 0.00270,
+    "p70": 0.00335,
+    "p80": 0.00430
+  },
+  "rules": [
+    {
+      "name": "moderada",
+      "garch_range": ["p40", "p50"],
+      "tp": 0.003,
+      "sl": 0.0015,
+      "description": "Volatilidad moderada: GARCH entre percentil 40 y 50"
+    },
+    {
+      "name": "media_alta",
+      "garch_range": ["p60", "p70"],
+      "tp": 0.004,
+      "sl": 0.002,
+      "description": "Volatilidad media-alta: GARCH entre percentil 60 y 70"
+    }
+  ]
+}
