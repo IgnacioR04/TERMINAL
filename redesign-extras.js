@@ -23,17 +23,66 @@
   function fmtPct2(x) { if (x == null || isNaN(x)) return '—'; const v = Number(x); return (v>=0?'+':'') + v.toFixed(2) + '%'; }
   function fmtPct3(x) { if (x == null || isNaN(x)) return '—'; const v = Number(x); return (v>=0?'+':'') + v.toFixed(3) + '%'; }
 
-  // BTC hourly candles cache — fetched once from Binance on first TFG view
+  // Hourly candles: use data/btc_1h.csv (in user's repo) — fallback to Binance.
   const _hourlyCache = {
-    bars: null,  // [{time,open,high,low,close}]
+    bars: null,
     promise: null,
   };
+  function parseCsv(text) {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const header = lines[0].toLowerCase().split(',').map(s => s.trim());
+    const ti = header.findIndex(h => /(time|date|open_time|timestamp)/.test(h));
+    const oi = header.indexOf('open');
+    const hi = header.indexOf('high');
+    const li = header.indexOf('low');
+    const ci = header.indexOf('close');
+    if (ti < 0 || ci < 0) return [];
+    const out = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      const raw = cols[ti]?.trim();
+      if (!raw) continue;
+      let t;
+      // numeric (epoch ms or s) or ISO
+      if (/^\d{12,}$/.test(raw)) t = Math.floor(Number(raw) / 1000);
+      else if (/^\d{9,11}$/.test(raw)) t = Number(raw);
+      else { const d = new Date(raw.replace(' ', 'T') + (raw.includes('Z') || raw.includes('+') ? '' : 'Z')); t = Math.floor(d.getTime() / 1000); }
+      if (!isFinite(t) || t <= 0) continue;
+      const o = parseFloat(cols[oi]), h = parseFloat(cols[hi]), l = parseFloat(cols[li]), c = parseFloat(cols[ci]);
+      if (!isFinite(c) || c <= 0) continue;
+      out.push({
+        time: t,
+        open: isFinite(o) && o > 0 ? o : c,
+        high: isFinite(h) && h > 0 ? h : c,
+        low:  isFinite(l) && l > 0 ? l : c,
+        close: c,
+      });
+    }
+    // Deduplicate & sort
+    const map = {};
+    out.forEach(b => { map[b.time] = b; });
+    return Object.values(map).sort((a, b) => a.time - b.time);
+  }
   async function fetchBtcHourly() {
     if (_hourlyCache.bars) return _hourlyCache.bars;
     if (_hourlyCache.promise) return _hourlyCache.promise;
     _hourlyCache.promise = (async () => {
+      // 1. Try CSV in user's repo
       try {
-        // Binance: 1000 hourly candles max per call → ~42 days. Stitch 2 calls for ~84 days.
+        const r = await fetch('data/btc_1h.csv?ts=' + Date.now());
+        if (r.ok) {
+          const text = await r.text();
+          const bars = parseCsv(text);
+          if (bars.length > 100) {
+            _hourlyCache.bars = bars;
+            console.log('[TFG] loaded', bars.length, 'hourly bars from CSV');
+            return bars;
+          }
+        }
+      } catch (e) { console.warn('btc_1h.csv fetch failed', e); }
+      // 2. Fallback: Binance public API (only works for the recent ~84 days)
+      try {
         const now = Date.now();
         const oneCall = async (endTime) => {
           const url = `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=1000&endTime=${endTime}`;
@@ -57,9 +106,11 @@
         const merged = {};
         [...batch2, ...batch1].forEach(b => { merged[b.time] = b; });
         _hourlyCache.bars = Object.values(merged).sort((a,b) => a.time - b.time);
+        console.log('[TFG] loaded', _hourlyCache.bars.length, 'hourly bars from Binance');
         return _hourlyCache.bars;
       } catch (e) {
-        console.warn('fetchBtcHourly failed', e);
+        console.warn('fetchBtcHourly Binance failed', e);
+        _hourlyCache.bars = [];
         return [];
       }
     })();
@@ -254,14 +305,14 @@
 
     pane.innerHTML = statsRow + posHtml + sigHtml + chartHtml + buildTradesTable('paper', trades);
 
-    setTimeout(() => {
-      const chart = renderTFGChart('r-tfg-paper-chart', { trades, includeOpen: pos, days: 30 });
+    setTimeout(async () => {
+      const chartObj = await renderTFGChart('r-tfg-paper-chart', { trades, includeOpen: pos, days: 30 });
       const zoom = document.getElementById('r-tfg-paper-zoom');
-      if (zoom && chart) {
+      if (zoom && chartObj) {
         zoom.querySelectorAll('.r-tfg-zoom-btn').forEach(b => b.addEventListener('click', () => {
           zoom.querySelectorAll('.r-tfg-zoom-btn').forEach(x => x.classList.remove('active'));
           b.classList.add('active');
-          chart.zoom(parseInt(b.dataset.days, 10));
+          chartObj.zoom(parseInt(b.dataset.days, 10));
         }));
       }
       attachTableSort('paper');
@@ -354,14 +405,14 @@
       chartHtml +
       buildTradesTable('bt', trades);
 
-    setTimeout(() => {
-      const chart = renderTFGChart('r-tfg-bt-chart', { trades, days: 0, backtest: true });
+    setTimeout(async () => {
+      const chartObj = await renderTFGChart('r-tfg-bt-chart', { trades, days: 0, backtest: true });
       const zoom = document.getElementById('r-tfg-bt-zoom');
-      if (zoom && chart) {
+      if (zoom && chartObj) {
         zoom.querySelectorAll('.r-tfg-zoom-btn').forEach(b => b.addEventListener('click', () => {
           zoom.querySelectorAll('.r-tfg-zoom-btn').forEach(x => x.classList.remove('active'));
           b.classList.add('active');
-          chart.zoom(parseInt(b.dataset.days, 10));
+          chartObj.zoom(parseInt(b.dataset.days, 10));
         }));
       }
       attachTableSort('bt');
@@ -382,19 +433,25 @@
     let candleType = 'hourly';
 
     if (opts.backtest) {
-      // backtest: use daily bars from STATE.historical
-      const dailyBars = STATE.historical?.categories?.crypto?.BTC?.bars || [];
-      bars = dailyBars
-        .filter(b => b.close != null && isFinite(b.close) && b.close > 0)
-        .map(b => ({
-          time: typeof b.time === 'number' ? b.time : Math.floor(new Date(b.date || b.time).getTime()/1000),
-          open: parseFloat(b.open ?? b.close),
-          high: parseFloat(b.high ?? b.close),
-          low:  parseFloat(b.low  ?? b.close),
-          close: parseFloat(b.close),
-        }))
-        .filter(b => isFinite(b.time) && b.time > 0);
-      candleType = 'daily';
+      // Backtest: try hourly CSV first (covers 2025 test set if user has full year)
+      bars = await fetchBtcHourly();
+      // If CSV doesn't cover the test period, fall back to daily
+      const cfgStart = STATE.backtest?.config?.test_start;
+      const earliestNeeded = cfgStart ? Math.floor(new Date(cfgStart).getTime() / 1000) : null;
+      if (!bars.length || (earliestNeeded && bars[0].time > earliestNeeded + 86400 * 7)) {
+        const dailyBars = STATE.historical?.categories?.crypto?.BTC?.bars || [];
+        bars = dailyBars
+          .filter(b => b.close != null && isFinite(b.close) && b.close > 0)
+          .map(b => ({
+            time: typeof b.time === 'number' ? b.time : Math.floor(new Date(b.date || b.time).getTime()/1000),
+            open: parseFloat(b.open ?? b.close),
+            high: parseFloat(b.high ?? b.close),
+            low:  parseFloat(b.low  ?? b.close),
+            close: parseFloat(b.close),
+          }))
+          .filter(b => isFinite(b.time) && b.time > 0);
+        candleType = 'daily';
+      }
     } else {
       bars = await fetchBtcHourly();
       if (!bars.length) {
@@ -714,10 +771,74 @@
       count: arr.length,
     })).sort((a, b) => b.avg - a.avg);
 
-    // Build heatmap + filters block
+    // Compute overview stats + top movers
+    const upN = data.filter(s => s.chg > 0).length;
+    const downN = data.filter(s => s.chg < 0).length;
+    const flatN = data.length - upN - downN;
+    const avgChg = data.reduce((a, b) => a + b.chg, 0) / data.length;
+    const winners = [...data].sort((a, b) => b.chg - a.chg).slice(0, 5);
+    const losers  = [...data].sort((a, b) => a.chg - b.chg).slice(0, 5);
+    const bestSector = sectorRows[0];
+    const worstSector = sectorRows[sectorRows.length - 1];
+
+    function moverPanel(title, items, isUp) {
+      return `
+        <div class="r-stocks-mover-panel">
+          <div class="r-stocks-mover-head">
+            <div class="r-stocks-heatmap-title">${title}</div>
+            <span class="r-cat ${isUp ? 'green' : 'red'}">TOP 5 ${isUp ? '↑' : '↓'}</span>
+          </div>
+          ${items.map(s => `
+            <div class="r-stocks-mover-row">
+              <div class="r-stocks-mover-name">
+                <span class="r-stocks-mover-ticker">${s.ticker}</span>
+                <span class="r-stocks-mover-co">${s.name.slice(0, 22)}</span>
+              </div>
+              <div class="r-stocks-mover-pct" style="color:var(--r-${isUp?'green':'red'})">${s.chg>=0?'+':''}${s.chg.toFixed(2)}%</div>
+            </div>
+          `).join('')}
+        </div>`;
+    }
+
+    // Build heatmap + filters + overview + movers
     const block = document.createElement('div');
     block.id = 'r-stocks-block';
     block.innerHTML = `
+      <div class="r-stocks-overview">
+        <div class="r-stocks-stat">
+          <div class="r-stocks-stat-label">Subiendo vs bajando</div>
+          <div class="r-stocks-stat-row">
+            <span class="r-stocks-stat-val" style="color:var(--r-green)">${upN}</span>
+            <span class="r-stocks-stat-sub">de ${data.length}</span>
+            <span class="r-stocks-stat-val" style="color:var(--r-red);margin-left:10px">${downN}</span>
+          </div>
+          <div style="height:6px;border-radius:3px;background:rgba(255,255,255,0.04);overflow:hidden;margin-top:12px;display:flex">
+            <div style="background:var(--r-green);width:${(upN/data.length)*100}%"></div>
+            <div style="background:rgba(255,255,255,0.06);width:${(flatN/data.length)*100}%"></div>
+            <div style="background:var(--r-red);width:${(downN/data.length)*100}%"></div>
+          </div>
+        </div>
+        <div class="r-stocks-stat">
+          <div class="r-stocks-stat-label">Cambio medio</div>
+          <div class="r-stocks-stat-row">
+            <span class="r-stocks-stat-val" style="color:var(--r-${avgChg>=0?'green':'red'})">${avgChg>=0?'+':''}${avgChg.toFixed(2)}%</span>
+          </div>
+          <div class="r-stocks-stat-sub" style="margin-top:8px">media ponderada de la sesión</div>
+        </div>
+        <div class="r-stocks-stat">
+          <div class="r-stocks-stat-label">Sector líder · rezagado</div>
+          <div class="r-stocks-stat-row" style="gap:18px;flex-wrap:wrap;margin-top:8px">
+            <div>
+              <div style="font-size:11px;color:var(--text-tertiary);font-weight:500">${bestSector?.sector || '—'}</div>
+              <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--r-green);margin-top:2px">${bestSector ? '+' + bestSector.avg.toFixed(2) + '%' : '—'}</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text-tertiary);font-weight:500">${worstSector?.sector || '—'}</div>
+              <div style="font-family:'DM Mono',monospace;font-size:16px;font-weight:700;color:var(--r-red);margin-top:2px">${worstSector ? worstSector.avg.toFixed(2) + '%' : '—'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="r-stocks-heatmap">
         <div class="r-stocks-heatmap-head">
           <div class="r-stocks-heatmap-title">Sectores · rendimiento medio del día</div>
@@ -737,11 +858,15 @@
           }).join('')}
         </div>
       </div>
+      <div class="r-stocks-movers-grid">
+        ${moverPanel('Top ganadores del día', winners, true)}
+        ${moverPanel('Top perdedores del día', losers, false)}
+      </div>
       <div class="r-stocks-filters">
         <div class="r-stocks-filter-group">
           <span class="r-stocks-filter-label">Sector</span>
           <button class="r-stocks-chip active" data-sec="all">Todos <span class="r-stocks-chip-count">${data.length}</span></button>
-          ${sectorRows.slice(0, 8).map(s => `
+          ${sectorRows.map(s => `
             <button class="r-stocks-chip" data-sec="${s.sector}">
               <span class="r-stocks-chip-dot" style="background:${sectorColor(s.sector)}"></span>${s.sector}
               <span class="r-stocks-chip-count">${s.count}</span>
