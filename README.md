@@ -1,22 +1,24 @@
 # TFG Terminal
 
-Terminal financiera estilo Revolut desplegada en GitHub Pages. Muestra mercados en vivo (cripto, acciones, materias primas, FX, bonos), noticias, calendario macro y un panel del modelo del TFG (HMM + GARCH + XGBoost MoE) que predice la dirección de BTC/USDT cada hora siguiendo exactamente la pipeline del notebook `definitivo_2.py`.
+Terminal financiera estilo Bloomberg/Revolut desplegada en GitHub Pages. Muestra mercados en vivo (cripto, acciones, materias primas, FX, bonos), noticias, calendario macro, un mapa de indicadores globales, flujos globales y un panel completo del modelo del TFG (HMM + GARCH + XGBoost MoE) con paper trading en vivo y backtest histórico.
 
 ## Estructura del repo
 
 ```
 .
 ├── .github/workflows/
-│   ├── live.yml             cada 2 min, live + señales TFG
-│   ├── historical.yml       diario 22:00 UTC, histórico macro
-│   └── stocks.yml           diario 22:30 UTC, 150 acciones
+│   ├── live.yml             cada 10 min — live data + paper trader
+│   ├── historical.yml       diario 22:00 UTC — histórico macro
+│   └── stocks.yml           diario 22:30 UTC — 150 acciones
 ├── data/
 │   ├── historical_data.json
 │   ├── live_data.json
-│   ├── tfg_signals.json
+│   ├── paper_trading.json      generado por paper_trader.py
+│   ├── paper_state.json        estado persistido del paper trader
+│   ├── backtest_history.json   resultado offline del backtest 2025
 │   ├── stocks_list.json
-│   └── stocks_detail/       un JSON por acción
-├── models/                  aquí van los .pkl entrenados del TFG
+│   └── stocks_detail/          un JSON por acción
+├── models/
 │   ├── hmm_vol.pkl
 │   ├── hmm_state_map.pkl
 │   ├── garch_params.pkl
@@ -24,55 +26,129 @@ Terminal financiera estilo Revolut desplegada en GitHub Pages. Muestra mercados 
 │   ├── xgb_8_experts.pkl
 │   ├── calibrators.pkl
 │   ├── feature_cols.pkl
-│   └── adaptive_rules.pkl   se genera con el notebook auxiliar
+│   ├── adaptive_rules.pkl
+│   └── tp_sl_rules.json        reglas TP/SL y percentiles GARCH
 ├── index.html               UI principal
+├── mapa-global.html         Mapa de indicadores mundiales (D3.js)
+├── noticias.html            Agregador de noticias
+├── flujos-globales.html     Mapa de flujos marítimos/aéreos (D3.js)
 ├── stocks.js                lógica de la pestaña Acciones
+├── redesign.css / redesign.js / redesign-pre.js / redesign-noticias.js
 ├── tickers.json             lista editable de las 150 acciones
+├── paper_trader.py          paper trading en vivo (reemplaza tfg_signals.py)
+├── tfg_signals.py           señales originales del TFG (obsoleto)
 ├── fetch_historical.py
 ├── fetch_live.py
 ├── fetch_stocks.py
-├── tfg_signals.py
 ├── requirements.txt
-├── .gitignore
 └── README.md
 ```
 
 ## Pasos para desplegar en GitHub Pages
 
 1. Crea el repo en GitHub y sube todos los ficheros.
-2. Sube tus 8 archivos `.pkl` a `models/`. El JSON de señales se genera igual aunque falten los modelos. La pestaña TFG mostrará un banner amarillo indicando los que faltan.
+2. Sube tus 8 archivos `.pkl` a `models/`. La UI muestra un banner amarillo indicando los que faltan.
 3. Ve a Settings → Pages, fuente "Deploy from a branch", branch `main` y carpeta `/ (root)`. Guarda.
-4. Ve a Actions y dale a Run workflow manualmente en este orden.
+4. Ve a Actions y dale a Run workflow manualmente en este orden:
    1. Historical macro (~15 min) genera `historical_data.json`.
    2. Stocks daily (~5-10 min) genera `stocks_list.json` y `stocks_detail/`.
-   3. Live data (~1 min) genera `live_data.json` y `tfg_signals.json`.
+   3. Live data (~1 min) genera `live_data.json` y `paper_trading.json`.
 5. A partir de ahí los crones se disparan solos.
 
-## Tres cosas importantes
+## Permisos de GitHub Actions
 
-1. Settings → Actions → General → Workflow permissions debe estar en "Read and write permissions" para que los workflows puedan hacer `git push` de los JSON. Si no, fallarán.
-2. El cron cada 2 minutos del `live.yml` consume ~21600 min/mes. El plan gratuito de GitHub Actions da 2000 min/mes, el Pro da 3000. Con GitHub Student Pack tienes Pro gratis siendo de UFV pero igual no llega para cada minuto. Recomendado para cuenta gratis: cron `*/5` o `*/10`. Edítalo en `live.yml`.
-3. Los `.gitkeep` son ficheros vacíos solo para que git suba las carpetas vacías. Cuando los workflows generen los JSON reales puedes borrarlos.
+Settings → Actions → General → Workflow permissions debe estar en **"Read and write permissions"** para que los workflows puedan hacer `git push` de los JSON.
 
-## El modelo del TFG (pestaña TFG)
+## Pestaña Modelo TFG — Paper Trading en vivo
 
-`tfg_signals.py` replica exactamente la pipeline horaria del notebook `definitivo_2.py`. En cada ejecución hace lo siguiente.
+La pestaña "Modelo TFG" tiene dos sub-pestañas:
 
-1. Descarga las últimas 1000 velas de BTC/USDT y ETH/USDT de Binance a resolución 1h y elimina la última vela en curso para mantener la causalidad.
-2. Descarga el histórico diario del índice Fear and Greed y lo reindexa a horario con forward fill.
-3. Construye las features causales idénticas al TFG. Logret + lags 1, 3, 6, 12, 24. RSI 14. MACD diff. Bollinger band width. ATR 14. Volumen normalizado. Volatilidad realizada 24h y 168h. Momentums 12, 24, 168h. EMA cross 12 vs 48 normalizado por volatilidad. Ratio BTC/ETH. Correlación 168h. Diff de volatilidad cross. Features de calendario sin/cos hora y día. Fear and Greed bruto, zscore 30d, change 7d, indicadores categóricos extreme fear/greed.
-4. Aplica el HMM forward filter univariante sobre `btc_volreal24` con los parámetros entrenados y obtiene `hmm_p_lowvol` y `hmm_p_highvol`.
-5. Aplica el GARCH(1,1) one-step-ahead con los parámetros entrenados sobre `btc_logret * 100` y obtiene `garch_vol_t1`.
-6. Aplica el filtro deadzone XGBoost + calibración isotónica para obtener `p_deadzone`.
-7. Llama al ensemble MoE de los 4 expertos calibrados (logloss, error, brier, sharpe). Cada experto es la combinación ponderada por las probabilidades del HMM de un modelo lowvol y otro highvol. Las probabilidades pasan por la calibración isotónica entrenada en validation.
-8. Para la vela actual evalúa las reglas adaptativas (version, side) con los multipliers calibrados a hit rate ≥ 80% en train. Para cada regla comprueba `confidence ≥ conf_thr + 0.06` y `p_deadzone ≤ 0.50`. Si pasa, genera una señal con TP dinámico `max(garch_vol × multiplier, MIN_TP_ABS)`. Sin stop loss.
-9. Escribe `data/tfg_signals.json` con la vela actual, la próxima vela target (t+1h), el régimen, GARCH, p_deadzone, las 4 predicciones, las señales evaluadas y un histórico de 200 velas para la gráfica.
+### Paper Trading
 
-Configuración validada en el TFG. `conf_boost = 0.06`, `dz_thr = 0.50`, sin SL. Resultado en test 2025. $1021 partiendo de $1000, 62 trades, win rate 67.7%.
+`paper_trader.py` corre cada 10 min en GitHub Actions. En cada ejecución:
 
-## Cómo generar el `adaptive_rules.pkl` (importante)
+1. Carga el estado persistido de `data/paper_state.json` (posición abierta, capital, historial de trades).
+2. Ejecuta la pipeline completa: features causales → HMM → GARCH → deadzone filter → XGBoost MoE versión **sharpe** → probabilidad calibrada.
+3. Si hay una posición abierta: comprueba si el precio actual ha alcanzado el TP, SL o si ha expirado el trade (máx. 48h). Si sí, cierra el trade y actualiza el capital.
+4. Si no hay posición y la vela ha cambiado: evalúa si la señal pasa todos los filtros:
+   - Dirección: solo **LONG** (`prob_cal ≥ 0.5`)
+   - Confianza: `≥ 60%`
+   - P(deadzone): `≤ 38%`
+   - GARCH vol: debe caer en un bin de regla activa (por debajo del percentil 80)
+5. Si pasa los filtros, abre una posición con el TP y SL de la regla correspondiente.
+6. Guarda `data/paper_state.json` y genera `data/paper_trading.json` para la UI.
 
-Tu notebook genera 7 archivos en `models/` pero no guarda explícitamente las reglas adaptativas como pkl. `tfg_signals.py` necesita un archivo `adaptive_rules.pkl` con un dict `{(version, side): {multiplier, conf_thr, dz_thr}}`. Hay un notebook auxiliar (`generar_adaptive_rules.ipynb`) que pegas en Colab al final de tu pipeline y crea el archivo. Mira la sección "Notebook auxiliar para Colab" más abajo.
+**Parámetros validados en el TFG (no modificar):**
+
+| Parámetro | Valor |
+|-----------|-------|
+| `CONF_THR` | 0.60 |
+| `DZ_THR` | 0.38 |
+| `COST_RT` | 0.0012 (0.12% round-trip) |
+| `VERSION` | sharpe |
+| `SIDE` | LONG |
+| `MAX_TRADE_H` | 48h |
+
+**Reglas TP/SL (`models/tp_sl_rules.json`):**
+
+| Bin | GARCH rango | TP | SL |
+|-----|-------------|----|----|
+| moderada | p40 ≤ garch < p50 | 0.30% | 0.15% |
+| media_alta | p60 ≤ garch < p70 | 0.40% | 0.20% |
+
+Los percentiles GARCH (`p40, p50, p60, p70, p80`) están en `models/tp_sl_rules.json` y deben actualizarse con los valores reales del conjunto de entrenamiento:
+```python
+import numpy as np, joblib
+garch_train = ...  # garch_vol_t1 sobre el train set
+pcts = np.percentile(garch_train, [40, 50, 60, 70, 80])
+# Edita models/tp_sl_rules.json con estos valores
+```
+
+### Backtest Histórico
+
+Datos estáticos en `data/backtest_history.json` generados offline desde el notebook. Muestra la curva de equity, estadísticas de resumen y log de trades del test set 2025.
+
+**Resultados validados:**
+- 67 trades · Win Rate 62.7% · Sharpe 11.54 · Retorno +2.12%
+- Solo versión sharpe, solo LONG
+- Start capital: $1000 → End: $1021.20
+
+## Mapa Global (`mapa-global.html`)
+
+Mapa interactivo D3.js con `geoNaturalEarth1`. Indicadores agrupados en 6 categorías:
+
+- **Economía**: PIB growth, PIB total, PIB per cápita, IPC, Desempleo
+- **Comercio exterior**: Exportaciones, Importaciones, Balanza comercial, FDI, Cuenta corriente
+- **Finanzas**: Deuda pública, Reservas internacionales, Ahorro bruto, FBCF
+- **Social**: Población, Esperanza de vida, Usuarios de internet
+- **Energía**: Consumo eléctrico, CO₂ per cápita, Electricidad renovable, Producción de petróleo
+- **Geopolítica**: Gasto militar, Tensiones/conflictos
+
+Datos: World Bank API con `mrv=10&per_page=3000&gapfill=Y`. Tensiones: datos estáticos ACLED/UCDP codificados en 6 niveles (verde=paz → rojo oscuro=guerra).
+
+Funcionalidades: zoom con doble click, botón reset, paleta divergente, ranking de países por indicador seleccionado.
+
+## Flujos Globales (`flujos-globales.html`)
+
+Mapa D3.js que muestra rutas marítimas y aéreas, puertos principales y zonas de riesgo geopolítico.
+
+- Filtros por tipo (marítimo/aéreo), por producto (petróleo, LNG, contenedores, etc.)
+- Barcos en tránsito con animaciones y tooltips
+- Zonas de riesgo por nivel (naranja=moderado → rojo=crítico)
+- Paleta de colores consistente con mapa-global.html
+
+## Noticias (`noticias.html`)
+
+Agregador de noticias financieras. Lee `data/live_data.json` (misma fuente que el dashboard). Filtrado por fuente, diseño de lista limpio con tiempo relativo y etiquetas de fuente.
+
+## Stack técnico
+
+- **Frontend**: HTML + CSS vanilla + Lightweight Charts (TradingView) + D3.js v7 + TopoJSON
+- **Backend**: Scripts Python que escriben JSON estáticos en `data/`
+- **Datos en vivo**: Binance public API (cripto) + Yahoo Finance (resto) + World Bank API (macro)
+- **Modelo ML**: hmmlearn, arch (GARCH), xgboost, scikit-learn
+- **Paper Trading**: Estado persistido en git entre ejecuciones de GitHub Actions
+- **Hosting**: GitHub Pages + GitHub Actions con git push automático cada 10 min
 
 ## Local (test)
 
@@ -81,32 +157,33 @@ pip install -r requirements.txt
 python fetch_historical.py
 python fetch_live.py
 python fetch_stocks.py       # ~5-10 min
-python tfg_signals.py         # necesita models/*.pkl
+python paper_trader.py       # necesita models/*.pkl
 python -m http.server 8000
 ```
 
 Y abre `http://localhost:8000`.
+
+## Cómo generar `adaptive_rules.pkl` y actualizar percentiles GARCH
+
+El notebook genera los 8 `.pkl` en `models/`. Además:
+
+1. **`adaptive_rules.pkl`**: genera con el notebook auxiliar `generar_adaptive_rules.ipynb`.
+2. **Percentiles GARCH**: después de correr la pipeline, ejecuta:
+   ```python
+   import numpy as np, json
+   pcts = np.percentile(df_train['garch_vol_t1'].dropna(), [40, 50, 60, 70, 80])
+   # Actualiza models/tp_sl_rules.json con los valores reales
+   ```
 
 ## Notas sobre las 150 acciones
 
 - Lista editable en `tickers.json`. 50 USA + 50 Europa + 50 Asia.
 - `stocks_list.json` se carga solo cuando entras a la pestaña Acciones (lazy load).
 - Cada ficha individual descarga su JSON propio (`stocks_detail/{ticker}.json`) al hacer click.
-- Tamaño total estimado tras la primera descarga. ~25-30 MB. Cabe en GitHub Pages.
-- Información por acción. Histórico diario 5 años, intradía 5m últimos 5 días, descripción, sector, industria, P/E, EPS, dividend yield, beta, market cap, 52w high/low, dividendos últimos 2 años, splits, próximos earnings.
-- Si `fetch_stocks.py` falla en algún ticker concreto, lo loggea y continúa con los demás.
 
 ## Personalización
 
-- Para añadir o quitar acciones, edita `tickers.json` y vuelve a ejecutar el workflow `Stocks daily`.
-- Para cambiar el cron del live, edita la línea `cron` en `.github/workflows/live.yml`. Sintaxis estándar `*/5 * * * *`.
-- Para cambiar tickers macro, edita el dict `TICKERS` al inicio de `fetch_historical.py` y `fetch_live.py`.
-- Para cambiar las fuentes de noticias, edita `RSS_FEEDS` en `fetch_live.py`.
-
-## Stack
-
-- Frontend. HTML + CSS vanilla + Lightweight Charts (TradingView).
-- Backend. Scripts Python que escriben JSON estáticos en `data/`.
-- Datos en vivo. Binance public API (cripto) + Yahoo Finance (resto).
-- Modelos. hmmlearn, arch, xgboost, scikit-learn.
-- Hosting. GitHub Pages + GitHub Actions con git push automático.
+- Para añadir/quitar acciones: edita `tickers.json` y re-ejecuta el workflow `Stocks daily`.
+- Para cambiar el cron del live: edita la línea `cron` en `.github/workflows/live.yml`.
+- Para cambiar los percentiles GARCH o las reglas TP/SL: edita `models/tp_sl_rules.json`.
+- Para resetear el paper trader a capital inicial: borra `data/paper_state.json` del repo.
