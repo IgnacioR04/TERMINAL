@@ -522,7 +522,7 @@
         markers.push({
           time: ot,
           position: 'belowBar',
-          color: 'var(--r-amber)', // entry
+          color: '#f9b023', // entry — amber
           shape: 'arrowUp',
           text: t.rule === 'media_alta' ? 'm-a' : (t.rule === 'moderada' ? 'mod' : ''),
           size: 1,
@@ -722,25 +722,21 @@
   let _stocksFilter = { region: 'all', sector: 'all', q: '' };
 
   function readStocksData() {
-    // The original stocks.js renders rows with data-* attributes.
-    // We just read from the table once and cache.
+    // The original stocks.js renders rows with columns:
+    //   0=Ticker · 1=Empresa · 2=Sector · 3=Región · 4=Precio · 5=Cambio · 6=MKT CAP · 7=P/E · 8=DIV YIELD
     const rows = document.querySelectorAll('#stocks-content tr[data-ticker], #stocks-content tbody tr');
     const out = [];
     rows.forEach(tr => {
       const cells = tr.children;
-      if (!cells || cells.length < 3) return;
-      // Try data attributes first, then text content
+      if (!cells || cells.length < 6) return;
       const ticker = tr.dataset.ticker || cells[0]?.textContent?.trim();
       const name = cells[1]?.textContent?.trim() || '';
       const sector = cells[2]?.textContent?.trim() || tr.dataset.sector || '';
-      const region = tr.dataset.region || '';
-      // price/chg may be in different columns; look for pct-like cell
-      let chgPct = 0;
-      for (let i = 3; i < cells.length; i++) {
-        const txt = cells[i]?.textContent?.trim() || '';
-        const m = txt.match(/([+-]?\d+\.?\d*)%/);
-        if (m) { chgPct = parseFloat(m[1]); break; }
-      }
+      const region = cells[3]?.textContent?.trim() || tr.dataset.region || '';
+      // CAMBIO is always cell index 5 — only read that one
+      const chgTxt = cells[5]?.textContent?.trim() || '';
+      const chgMatch = chgTxt.match(/([+-]?\d+\.?\d*)%/);
+      const chgPct = chgMatch ? parseFloat(chgMatch[1]) : 0;
       out.push({ ticker, name, sector, region, chg: chgPct });
     });
     return out;
