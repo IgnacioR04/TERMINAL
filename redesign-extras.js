@@ -718,13 +718,6 @@
     const block = document.createElement('div');
     block.id = 'r-stocks-block';
     block.innerHTML = `
-      <div class="r-section-head" style="margin-bottom:14px">
-        <div>
-          <div class="r-section-title">Acciones</div>
-          <div class="r-section-sub">${data.length} valores cotizados — explora por sector, región o busca un ticker.</div>
-        </div>
-        <div class="r-section-action"><span class="r-ribbon">en vivo</span></div>
-      </div>
       <div class="r-stocks-heatmap">
         <div class="r-stocks-heatmap-head">
           <div class="r-stocks-heatmap-title">Sectores · rendimiento medio del día</div>
