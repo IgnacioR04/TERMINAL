@@ -402,7 +402,8 @@
             <button class="r-tfg-zoom-btn" data-days="7">7D</button>
             <button class="r-tfg-zoom-btn" data-days="30">30D</button>
             <button class="r-tfg-zoom-btn" data-days="90">90D</button>
-            <button class="r-tfg-zoom-btn active" data-days="0">MAX</button>
+            <button class="r-tfg-zoom-btn active" data-days="test">2025</button>
+            <button class="r-tfg-zoom-btn" data-days="0">MAX</button>
           </div>
         </div>
         <div class="r-tfg-chart-body" id="r-tfg-bt-chart"></div>
@@ -416,13 +417,20 @@
       buildTradesTable('bt', trades);
 
     setTimeout(async () => {
-      const chartObj = await renderTFGChart('r-tfg-bt-chart', { trades, days: 0, backtest: true });
+      const chartObj = await renderTFGChart('r-tfg-bt-chart', {
+        trades,
+        days: 'test',          // default view = test period (2025)
+        backtest: true,
+        testStart: cfg.test_start,
+        testEnd: cfg.test_end,
+      });
       const zoom = document.getElementById('r-tfg-bt-zoom');
       if (zoom && chartObj) {
         zoom.querySelectorAll('.r-tfg-zoom-btn').forEach(b => b.addEventListener('click', () => {
           zoom.querySelectorAll('.r-tfg-zoom-btn').forEach(x => x.classList.remove('active'));
           b.classList.add('active');
-          chartObj.zoom(parseInt(b.dataset.days, 10));
+          const dv = b.dataset.days;
+          chartObj.zoom(dv === 'test' ? 'test' : parseInt(dv, 10));
         }));
       }
       attachTableSort('bt');
@@ -558,10 +566,10 @@
         markers.push({ time: ot, position: 'belowBar', color: '#f9b023', shape: 'circle', text: 'OPEN', size: 2 });
       }
     }
-    // Sort & dedupe by time
+    // Sort & dedupe — key includes position+text so BUY and SELL at same candle both survive
     const byTime = {};
     markers.sort((a,b) => a.time - b.time).forEach(m => {
-      const key = m.time + '|' + m.position;
+      const key = m.time + '|' + m.position + '|' + (m.text || '');
       if (!byTime[key]) byTime[key] = m;
     });
     const finalMarkers = Object.values(byTime).sort((a,b) => a.time - b.time);
@@ -569,7 +577,18 @@
 
     // Initial zoom
     function zoom(days) {
-      if (days === 0) {
+      if (days === 'test') {
+        // Zoom to the configured test period (e.g. 2025-01-01 → 2025-12-31)
+        if (opts.testStart) {
+          const from = Math.floor(new Date(opts.testStart).getTime() / 1000);
+          const to   = opts.testEnd
+            ? Math.floor(new Date(opts.testEnd).getTime() / 1000) + 86400 * 3
+            : bars[bars.length - 1].time + 86400;
+          chart.timeScale().setVisibleRange({ from, to });
+        } else {
+          chart.timeScale().fitContent();
+        }
+      } else if (!days || days === 0) {
         chart.timeScale().fitContent();
       } else {
         const last = bars[bars.length - 1].time;
@@ -756,11 +775,11 @@
   function enhanceStocksTab() {
     const content = document.getElementById('stocks-content');
     if (!content) return;
-    if (content.dataset.rEnhanced) return;
+    // Guard: block already built — survives region re-renders since it's a sibling of #stocks-content
+    if (document.getElementById('r-stocks-block')) return;
     // Wait for the original to render real rows
     const rows = content.querySelectorAll('tbody tr');
     if (rows.length < 5) return;  // not ready yet
-    content.dataset.rEnhanced = '1';
 
     const data = readStocksData();
     if (!data.length) return;
@@ -883,14 +902,9 @@
       </div>
     `;
 
-    // Find controls / table containers from the original render
-    const controls = content.querySelector('.stocks-controls');
-    // Insert block BEFORE controls (or at top of content if no controls)
-    if (controls) {
-      controls.parentNode.insertBefore(block, controls);
-    } else {
-      content.insertBefore(block, content.firstChild);
-    }
+    // Insert block as a sibling BEFORE #stocks-content so it survives stocks.js render() calls
+    // (render() only replaces #stocks-content.innerHTML, not its siblings)
+    content.parentNode.insertBefore(block, content);
 
     // Wire heatmap & chip clicks → trigger original search/region filter
     block.querySelectorAll('.r-stocks-heat-cell').forEach(cell => {
