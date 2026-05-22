@@ -26,14 +26,14 @@ jobs:
       - name: Fetch live data
         run: python fetch_live.py
 
-      - name: Run TFG signals
-        run: python tfg_signals.py
+      - name: Run paper trader
+        run: python paper_trader.py
 
       - name: Push data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add data/live_data.json data/paper_trading.json data/paper_state.json || true
           git diff --cached --quiet && exit 0
           git commit -m "live data $(date -u +%Y-%m-%dT%H:%M)"
           for i in 1 2 3 4 5; do
