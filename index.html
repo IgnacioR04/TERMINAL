@@ -1283,6 +1283,13 @@ body {
   </svg>
 </template>
 
+<div id="proto-banner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#b45309;color:#fff;font-size:11.5px;font-family:inherit;padding:5px 16px;display:flex;align-items:center;gap:10px;line-height:1.4">
+  <span style="font-size:15px">⚠</span>
+  <span><b>Prototipo académico</b> · Algunos datos pueden no ser precisos por limitaciones de las APIs gratuitas (precios en moneda local para acciones europeas/asiáticas, datos de cierre retrasados, etc.).</span>
+  <button onclick="document.getElementById('proto-banner').style.display='none'" style="margin-left:auto;background:rgba(0,0,0,0.25);border:none;color:#fff;cursor:pointer;padding:2px 8px;border-radius:4px;font-size:12px;flex-shrink:0">✕</button>
+</div>
+<div style="height:29px"></div>
+
 <div class="app">
 
   <!-- ── SIDEBAR ── -->
