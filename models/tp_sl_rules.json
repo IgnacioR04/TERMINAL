@@ -1,5 +1,5 @@
 {
-  "_note": "Percentiles GARCH calculados con np.percentile(garch_vol_t1_train,[40,50,60,70,80]) sobre el train set. Actualizar si se re-entrena el modelo.",
+  "_note": "Percentiles GARCH calculados sobre garch_vol_t1 del train set (2017-2022). Los valores p50-p80 provienen de garch_params.pkl['thresholds']; p30 y p40 de garch_pct_estudio del notebook (GARCH_PERCENTILES_ESTUDIO=[30,40,50,60,70,80,90]). Confirmar con notebook output: muy_baja:[0,0.005007) baja:[0.005007,0.005686) moderada:[0.005686,0.006373) media_alta:[0.007235,0.008428) alta:[0.008428,0.010147) muy_alta:[0.010147,0.013421)",
   "version": "sharpe",
   "filters": {
     "min_confidence": 0.60,
@@ -8,11 +8,13 @@
     "direction": "LONG"
   },
   "garch_percentiles": {
-    "p40": 0.00182,
-    "p50": 0.00221,
-    "p60": 0.00270,
-    "p70": 0.00335,
-    "p80": 0.00430
+    "p30": 0.005007,
+    "p40": 0.005686,
+    "p50": 0.006373,
+    "p60": 0.007235,
+    "p70": 0.008428,
+    "p80": 0.010147,
+    "p90": 0.013421
   },
   "rules": [
     {
@@ -20,14 +22,14 @@
       "garch_range": ["p40", "p50"],
       "tp": 0.003,
       "sl": 0.0015,
-      "description": "Volatilidad moderada: GARCH entre percentil 40 y 50"
+      "description": "Volatilidad moderada: GARCH entre percentil 40 y 50 [0.005686, 0.006373)"
     },
     {
       "name": "media_alta",
       "garch_range": ["p60", "p70"],
       "tp": 0.004,
       "sl": 0.002,
-      "description": "Volatilidad media-alta: GARCH entre percentil 60 y 70"
+      "description": "Volatilidad media-alta: GARCH entre percentil 60 y 70 [0.007235, 0.008428)"
     }
   ]
 }
