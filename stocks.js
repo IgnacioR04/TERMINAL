@@ -105,16 +105,32 @@ window.StocksTab = (function () {
 
     applySort();
 
+    // Currency helpers
+    const CURRENCY_SYM = { USD:'$', EUR:'€', GBP:'£', GBp:'£', JPY:'¥', HKD:'HK$', CHF:'Fr', INR:'₹', CNY:'¥', KRW:'₩' };
+    function currSym(cur) { return CURRENCY_SYM[cur] || (cur ? cur + ' ' : '$'); }
+    function fmtPrice(price, cur) {
+      if (price == null) return `<span style="color:var(--text-muted)">—</span>`;
+      const sym = currSym(cur);
+      const isJpy = cur === 'JPY' || cur === 'KRW';
+      const num = isJpy
+        ? Math.round(price).toLocaleString('en-US')
+        : Number(price).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+      const nonUsd = cur && cur !== 'USD';
+      return nonUsd
+        ? `${sym}${num}<span style="font-size:9.5px;color:var(--text-tertiary);margin-left:3px">${cur}</span>`
+        : `${sym}${num}`;
+    }
+
     const rows = filtered.map(s => {
-      // Price
-      const priceHtml = (s.price == null)
-        ? `<span style="color:var(--text-muted)">—</span>`
-        : Number(s.price).toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
+      const cur = s.currency || 'USD';
+
+      // Price with currency symbol
+      const priceHtml = fmtPrice(s.price, cur);
 
       // Change pill / market-closed pill
       let chgHtml;
       if (s.change_pct == null) {
-        chgHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.3)"><i class="ti ti-clock" style="font-size:10px"></i>Cerrado</span>`;
+        chgHtml = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:12px;background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.3)"><i class="ti ti-clock" style="font-size:10px"></i>Sin datos</span>`;
       } else {
         const cls  = s.change_pct >= 0 ? "up" : "down";
         const sign = s.change_pct >= 0 ? "+" : "";
