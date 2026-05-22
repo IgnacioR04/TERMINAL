@@ -26,7 +26,7 @@ CRYPTO_IDS = {
     "DOGEUSDT": "dogecoin",
     "LINKUSDT": "chainlink",
     "DOTUSDT":  "polkadot",
-    "MATICUSDT":"matic-network",
+    "MATICUSDT":"polygon-ecosystem-token",  # MATIC → POL desde sep 2023
     "ATOMUSDT": "cosmos",
 }
 
