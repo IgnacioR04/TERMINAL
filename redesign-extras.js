@@ -187,7 +187,14 @@
       return;
     }
     if (d.status === 'models_missing') {
-      pane.innerHTML = `<div class="r-tfg-banner"><i class="ti ti-alert-triangle"></i> Modelos faltantes: <code>${(d.missing||[]).join(', ')}</code>. Sube los <code>.pkl</code> a <code>models/</code>.</div>`;
+      const missingList = d.missing && d.missing.length > 0
+        ? ` Modelos faltantes: <code>${d.missing.join(', ')}</code>.`
+        : '';
+      pane.innerHTML = `<div class="r-tfg-banner">
+        <i class="ti ti-alert-triangle"></i>
+        ${missingList || (d.message || 'Los modelos no están disponibles todavía.')}
+        Sube los <code>.pkl</code> a <code>models/</code> y ejecuta el workflow <em>Live data</em> en GitHub Actions.
+      </div>`;
       return;
     }
     if (d.status !== 'ok') {
@@ -289,8 +296,9 @@
           <div class="r-tfg-chart-legend">
             <span class="r-tfg-chart-legend-item"><span class="r-tfg-chart-legend-swatch" style="background:rgba(255,92,92,0.18)"></span>highvol</span>
             <span class="r-tfg-chart-legend-item"><span class="r-tfg-chart-legend-swatch" style="background:rgba(77,139,255,0.15)"></span>lowvol</span>
-            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-green)">▲</span>WIN</span>
-            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-red)">▼</span>LOSS</span>
+            <span class="r-tfg-chart-legend-item"><span style="color:#f9b023">▲</span>compra</span>
+            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-green)">▼TP</span></span>
+            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-red)">▼SL</span></span>
             <span class="r-tfg-chart-legend-item"><span style="color:var(--r-amber)">●</span>abierto</span>
           </div>
           <div class="r-tfg-zoom-row" id="r-tfg-paper-zoom">
@@ -385,8 +393,10 @@
           <div class="r-tfg-chart-legend">
             <span class="r-tfg-chart-legend-item"><span class="r-tfg-chart-legend-swatch" style="background:rgba(255,92,92,0.18)"></span>highvol</span>
             <span class="r-tfg-chart-legend-item"><span class="r-tfg-chart-legend-swatch" style="background:rgba(77,139,255,0.15)"></span>lowvol</span>
-            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-green)">▲</span>WIN</span>
-            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-red)">▼</span>LOSS</span>
+            <span class="r-tfg-chart-legend-item"><span style="color:#f9b023">▲</span>entrada</span>
+            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-green)">▼</span>TP</span>
+            <span class="r-tfg-chart-legend-item"><span style="color:var(--r-red)">▼</span>SL</span>
+            <span class="r-tfg-chart-legend-item"><span style="color:#f9b023">▼</span>T/O</span>
           </div>
           <div class="r-tfg-zoom-row" id="r-tfg-bt-zoom">
             <button class="r-tfg-zoom-btn" data-days="7">7D</button>
@@ -533,9 +543,10 @@
         const to  = t.result === 'TIMEOUT';
         markers.push({
           time: ct,
-          position: win ? 'aboveBar' : 'belowBar',
+          position: 'aboveBar',
           color: win ? '#00d09c' : to ? '#f9b023' : '#ff5c5c',
-          shape: win ? 'arrowDown' : 'arrowUp',
+          shape: 'arrowDown',
+          text: win ? 'TP' : to ? 'T/O' : 'SL',
           size: 1.2,
         });
       }
