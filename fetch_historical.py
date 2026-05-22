@@ -62,7 +62,7 @@ TICKERS = {
     },
     "bonds": {
         "US10Y":  {"symbol": "^TNX", "name": "US 10Y Yield"},
-        "US2Y":   {"symbol": "^IRX", "name": "US 13W T-Bill"},
+        "US2Y":   {"symbol": "^IRX", "name": "US 3M T-Bill"},
         "US30Y":  {"symbol": "^TYX", "name": "US 30Y Yield"},
     },
 }
