@@ -1,13 +1,16 @@
 # fetch_btc_hourly.py
-# Mantiene data/btc_1h.csv completo y actualizado usando la API publica de Binance.
+# Mantiene data/btc_1h.csv completo y actualizado.
+#
+# Fuente primaria: Binance API publica (no requiere key).
+# Fuente fallback: Yahoo Finance via yfinance (funciona desde GitHub Actions
+#                  donde Binance suele estar bloqueada).
 #
 # Logica:
 #   1. Lee TODOS los timestamps del CSV y detecta huecos internos (>= 2h de diferencia).
-#   2. Para huecos en los ultimos LOOKBACK_DAYS dias, pide a Binance los datos que faltan.
+#   2. Para huecos en los ultimos LOOKBACK_DAYS dias, pide los datos que faltan.
 #   3. Tambien descarga el tramo final (desde la ultima barra hasta ahora).
 #   4. Si se anadieron filas nuevas con huecos internos, re-ordena el CSV y elimina duplicados.
 #
-# Asi el CSV siempre esta completo y nunca necesitamos pedir mas de unos dias de golpe.
 # Llamado desde historical.yml una vez al dia (cron "0 22 * * *").
 
 import csv
@@ -59,8 +62,8 @@ def _kline_to_row(k):
     }
 
 
-def fetch_range(start_ms, end_ms):
-    """Descarga todas las klines entre start_ms y end_ms (exclusivo)."""
+def _fetch_range_binance(start_ms, end_ms):
+    """Descarga klines de Binance (puede fallar si la IP esta bloqueada)."""
     rows = []
     batch = start_ms
     while batch < end_ms:
@@ -78,6 +81,68 @@ def fetch_range(start_ms, end_ms):
         batch = last_ts_ms + 3_600_000
         time.sleep(0.2)
     return rows
+
+
+def _fetch_range_yfinance(start_s, end_s):
+    """Fallback: descarga klines 1h de Yahoo Finance (funciona en GitHub Actions)."""
+    try:
+        import yfinance as yf
+        import pandas as pd
+
+        start_dt = datetime.fromtimestamp(start_s, tz=timezone.utc)
+        end_dt   = datetime.fromtimestamp(end_s,   tz=timezone.utc)
+        ticker   = yf.Ticker("BTC-USD")
+        df       = ticker.history(start=start_dt, end=end_dt, interval="1h", auto_adjust=False)
+
+        if df is None or df.empty:
+            return []
+
+        df = df.reset_index()
+        date_col = "Datetime" if "Datetime" in df.columns else "Date"
+        rows = []
+        for _, row in df.iterrows():
+            d = row[date_col]
+            try:
+                if d.tz is None:
+                    d = d.tz_localize("UTC")
+                else:
+                    d = d.tz_convert("UTC")
+            except Exception:
+                pass
+            ts_row = int(d.timestamp())
+            if ts_row >= end_s:
+                continue
+            rows.append({
+                "datetime_utc":      d.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "open":              str(float(row.get("Open",   0) or 0)),
+                "high":              str(float(row.get("High",   0) or 0)),
+                "low":               str(float(row.get("Low",    0) or 0)),
+                "close":             str(float(row.get("Close",  0) or 0)),
+                "volume":            str(float(row.get("Volume", 0) or 0)),
+                "asset":             "btc",
+                "symbol_requested":  "BTC-USD",
+                "symbol_used":       "BTC-USD",
+                "provider":          "yfinance",
+            })
+        return rows
+    except Exception as e:
+        print(f"  Error yfinance fallback: {e}")
+        return []
+
+
+def fetch_range(start_ms, end_ms):
+    """
+    Descarga klines entre start_ms y end_ms (ms, exclusivo).
+    Intenta Binance primero; si falla o devuelve vacio, usa yfinance.
+    """
+    try:
+        rows = _fetch_range_binance(start_ms, end_ms)
+        if rows:
+            return rows
+        print("  Binance: sin datos para este rango. Usando yfinance...")
+    except Exception as e:
+        print(f"  Binance no disponible ({type(e).__name__}: {e}). Usando yfinance...")
+    return _fetch_range_yfinance(start_ms // 1000, end_ms // 1000)
 
 
 # --- Lectura y analisis del CSV ----------------------------------------------

@@ -24,8 +24,9 @@ jobs:
           cache: "pip"
       - run: pip install -r requirements.txt
       - run: python fetch_historical.py
-      - name: Update BTC 1h CSV (fill gap from Binance API)
+      - name: Update BTC 1h CSV (Binance primary, yfinance fallback)
         run: python fetch_btc_hourly.py
+        continue-on-error: true
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
