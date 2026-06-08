@@ -387,7 +387,7 @@ def fetch_btc_daily_klines(limit=365):
                 "low": "min",
                 "close": "last",
                 "volume": "sum",
-            }).dropna()
+            }).dropna().tail(limit)  # maximo `limit` dias (evita JSON de 500 KB)
             for dt, row in daily.iterrows():
                 ts = int(dt.timestamp())
                 out.append({
@@ -439,14 +439,8 @@ def main():
     out["btc_klines_5m"] = fetch_btc_klines("5m", 120)
     print(f"  {len(out['btc_klines_5m'])} velas 5m")
 
-    # Append nuevas velas 1h a los CSV
-    print("Actualizando CSV BTC 1h...")
-    n = append_hourly_csv("BTC-USD", "data/btc_1h.csv", "btc")
-    print(f"  {n} velas nuevas")
-
-    print("Actualizando CSV ETH 1h...")
-    n = append_hourly_csv("ETH-USD", "data/eth_1h.csv", "eth")
-    print(f"  {n} velas nuevas")
+    # btc_1h.csv y eth_1h.csv los gestiona historical.yml (fetch_btc_hourly.py).
+    # No los modificamos aquí para evitar conflictos en git pull --rebase del live workflow.
 
     for category, tickers in YF_TICKERS.items():
         print(f"YF {category}...")

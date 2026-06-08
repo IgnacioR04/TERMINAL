@@ -5,6 +5,9 @@ on:
     - cron: '*/10 * * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: push-live
   cancel-in-progress: true
@@ -33,6 +36,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Descartar cambios no stagiados en CSV (los gestiona historical.yml, no este workflow)
+          git restore data/btc_1h.csv data/eth_1h.csv 2>/dev/null || git checkout -- data/btc_1h.csv data/eth_1h.csv 2>/dev/null || true
           git add data/live_data.json data/paper_trading.json data/paper_state.json || true
           git diff --cached --quiet && exit 0
           git commit -m "live data $(date -u +%Y-%m-%dT%H:%M)"
